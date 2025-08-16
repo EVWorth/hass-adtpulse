@@ -3,8 +3,8 @@
 Home Assistant integration for [ADT Pulse](https://portal.adtpulse.com/) security systems for both alarming/disarming, as well as sensor status (motion, door, window, etc).
 
 ![beta_badge](https://img.shields.io/badge/maturity-Beta-yellow.png)
-![release_badge](https://img.shields.io/github/v/release/homeassistant-projects/hass-adtpulse.svg)
-![release_date](https://img.shields.io/github/release-date/homeassistant-projects/hass-adtpulse.svg)
+![release_badge](https://img.shields.io/github/v/release/EVWorth/hass-adtpulse.svg)
+![release_date](https://img.shields.io/github/release-date/EVWorth/hass-adtpulse.svg)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -40,7 +40,7 @@ If you have trouble with installation and configuration, visit the [ADT Pulse Ho
 
 ### Step 1: Install Custom Components
 
-Make sure that [Home Assistant Community Store (HACS)](https://github.com/custom-components/hacs) is installed and then add the "Integration" repository: *homeassistant-projects/hass-adtpulse*.
+Make sure that [Home Assistant Community Store (HACS)](https://github.com/custom-components/hacs) is installed and then add the "Integration" repository: *EVWorth/hass-adtpulse*.
 
 Note: Manual installation by direct download and copying is not supported, if you have issues, please first try installing this integration with HACS.
 
@@ -57,7 +57,7 @@ To enable ADT Pulse, add `ADT Pulse` from HA Settings -> Integrations -> Add Int
 3. Login to your account.
 4. If the device isn't trusted, it will prompt you for a code, afterwards you will be asked if you want to trust the device. Give it a name and click Save and Continue.
 
-![ADT Save Device](https://github.com/homeassistant-projects/hass-adtpulse/blob/master/docs/adt_save_device.jpg?raw=true)
+![ADT Save Device](https://github.com/EVWorth/hass-adtpulse/blob/master/docs/adt_save_device.jpg?raw=true)
 
 5. Get the fingerprint. There are 2 ways to do this:
 
@@ -65,7 +65,7 @@ To enable ADT Pulse, add `ADT Pulse` from HA Settings -> Integrations -> Add Int
 
    - Open up the developer tools and look for the page called "signin.jsp". Under the form data, look for "fingerprint". Copy that value and use it for the device_id value in your configuration.yaml file. If for some reason you didn't record, just re-login to your account again with the same browser.
 
-![ADT Form Data](https://github.com/homeassistant-projects/hass-adtpulse/blob/master/docs/adt_form_data.jpg?raw=true)
+![ADT Form Data](https://github.com/EVWorth/hass-adtpulse/blob/master/docs/adt_form_data.jpg?raw=true)
 
 
 ## Options
@@ -93,7 +93,7 @@ The integration provides the following devices:
 
 #### Sensors
 
-![Lovelace Example](https://github.com/homeassistant-projects/hass-adtpulse/blob/master/docs/adt_motion_status.png?raw=true)
+![Lovelace Example](https://github.com/EVWorth/hass-adtpulse/blob/master/docs/adt_motion_status.png?raw=true)
 
 Current status of motion detectors:
 
@@ -112,7 +112,7 @@ title: Motion Sensors
 show_header_toggle: false
 ```
 
-![Lovelace Example](https://github.com/homeassistant-projects/hass-adtpulse/blob/master/docs/adt_motion_history.png?raw=true)
+![Lovelace Example](https://github.com/EVWorth/hass-adtpulse/blob/master/docs/adt_motion_history.png?raw=true)
 
 Motion detected history:
 
@@ -151,7 +151,7 @@ show_header_toggle: false
 
 Using [Home Assistant's built-in Alarm Panel Card](https://www.home-assistant.io/lovelace/alarm-panel/):
 
-![Lovelace Example](https://github.com/homeassistant-projects/hass-adtpulse/blob/master/docs/adt_alarm_panel.png?raw=true)
+![Lovelace Example](https://github.com/EVWorth/hass-adtpulse/blob/master/docs/adt_alarm_panel.png?raw=true)
 
 ```yaml
 type: alarm-panel
@@ -211,4 +211,4 @@ No plans to implement support for the following (however, feel free to contribut
 # Credits
 * Current Maintainer(s): [Elliot Worth / EVWorth@](https://github.com/EVWorth)
 * Huge thanks to [Robert Lippmann / rlippmann@](https://github.com/rlippmann). During 2023-2024 Richard made major contributions to pyadtpulse to support async behavior, including switching Home Assistant integration to fully use the async mechanism.
-* [Ryan Snodgrass](https://github.com/homeassistant-projects) for originally contributing a skeleton and initial working implementation to have a Home Assistant integration.
+* [Ryan Snodgrass](https://github.com/rsnodgrass) for originally contributing a skeleton and initial working implementation to have a Home Assistant integration.
