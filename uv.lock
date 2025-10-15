@@ -810,7 +810,7 @@ wheels = [
 
 [[package]]
 name = "hass-adtpulse"
-version = "0.5.1"
+version = "0.6.0"
 source = { virtual = "." }
 dependencies = [
     { name = "homeassistant" },
@@ -827,7 +827,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "homeassistant", specifier = ">=2025.8.0" },
-    { name = "pyadtpulse", specifier = ">=1.2.11" },
+    { name = "pyadtpulse", specifier = ">=1.2.12" },
 ]
 
 [package.metadata.requires-dev]
@@ -1331,7 +1331,7 @@ wheels = [
 
 [[package]]
 name = "pyadtpulse"
-version = "1.2.11"
+version = "1.2.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1339,9 +1339,9 @@ dependencies = [
     { name = "lxml" },
     { name = "uvloop" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/45/0b2a7d1833552ffcb206001145974a912944dc8c62dc991228c7b76ed89d/pyadtpulse-1.2.11.tar.gz", hash = "sha256:2817d84873886d147b0b94b1e093e355ca9abbd78c18cb8e9ca286dd5cc3508f", size = 208956, upload-time = "2025-07-13T02:15:54.405Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/6e/91d98fab5ee2747c0cc525b309efafee86761f801d0d162ceda554a99422/pyadtpulse-1.2.12.tar.gz", hash = "sha256:f4f3ed83094b66f13ed58c10d701bde86c4e49868497bd060d1243d77e872d2f", size = 37621, upload-time = "2025-10-15T01:27:28.938Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/cb/1a50ac406641a6da8f4288fcd9552fc19e177348f2752f39b8706de2883f/pyadtpulse-1.2.11-py3-none-any.whl", hash = "sha256:b411604a6813df68f2fe95d22ccb9501230bbd14b9d32a61b66648d2c536aba8", size = 46922, upload-time = "2025-07-13T02:15:52.953Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/5c/b7bf8f6f8b1178b67dd09866b4e025c45076942e9917226004d564f57e94/pyadtpulse-1.2.12-py3-none-any.whl", hash = "sha256:726ed9d56f3d2c0ee6a77b6733df5b43f23b36d7df31404faf143ed288bdf868", size = 46964, upload-time = "2025-10-15T01:27:27.209Z" },
 ]
 
 [[package]]
