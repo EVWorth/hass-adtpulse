@@ -1,7 +1,5 @@
 """ADT Pulse utility functions."""
 
-from __future__ import annotations
-
 from pyadtpulse.site import ADTPulseSite
 from pyadtpulse.const import STATE_OK, STATE_ONLINE
 from pyadtpulse.zones import ADTPulseZoneData
@@ -13,7 +11,10 @@ from .const import ADTPULSE_DOMAIN
 
 
 def migrate_entity_name(
-    hass: HomeAssistant, site: ADTPulseSite, platform_name: str, entity_uid: str
+    hass: HomeAssistant,
+    site: ADTPulseSite,
+    platform_name: str,
+    entity_uid: str,
 ) -> None:
     """Migrate old entity names."""
     registry = er.async_get(hass)

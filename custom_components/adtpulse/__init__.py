@@ -3,11 +3,9 @@
 See https://github.com/EVWorth/hass-adtpulse
 """
 
-from __future__ import annotations
-
+import logging
 from typing import Any
 from asyncio import gather
-from logging import getLogger
 
 from pyadtpulse.const import (
     ADT_DEFAULT_POLL_INTERVAL,
@@ -44,9 +42,13 @@ from .const import (
 )
 from .coordinator import ADTPulseDataUpdateCoordinator
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-SUPPORTED_PLATFORMS = ["alarm_control_panel", "binary_sensor", "sensor"]
+SUPPORTED_PLATFORMS = [
+    "alarm_control_panel",
+    "binary_sensor",
+    "sensor",
+]
 
 CONFIG_SCHEMA = config_entry_only_config_schema(ADTPULSE_DOMAIN)
 
@@ -95,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     host = entry.data[CONF_HOSTNAME]
     if host:
-        LOG.debug("Using ADT Pulse API host %s", host)
+        logger.debug("Using ADT Pulse API host %s", host)
     if username is None or password is None or fingerprint is None:
         raise ConfigEntryAuthFailed("Null value for username, password, or fingerprint")
     service = PyADTPulseAsync(
@@ -111,7 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await service.async_login()
     except PulseAuthenticationError as ex:
-        LOG.error("Unable to connect to ADT Pulse: %s", ex)
+        logger.error("Unable to connect to ADT Pulse: %s", ex)
         raise ConfigEntryAuthFailed(
             f"{ADTPULSE_DOMAIN} could not log in due to a protocol error"
         ) from ex
@@ -120,18 +122,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         PulseServiceTemporarilyUnavailableError,
         PulseGatewayOfflineError,
     ) as ex:
-        LOG.error("Unable to connect to ADT Pulse: %s", ex)
+        logger.error("Unable to connect to ADT Pulse: %s", ex)
         raise ConfigEntryNotReady(
             f"{ADTPULSE_DOMAIN} could not log in due to service unavailability"
         ) from ex
 
     if service.sites is None:
-        LOG.error("%s could not retrieve any sites", ADTPULSE_DOMAIN)
+        logger.error("%s could not retrieve any sites", ADTPULSE_DOMAIN)
         raise ConfigEntryNotReady(f"{ADTPULSE_DOMAIN} could not retrieve any sites")
     try:
         service.site.gateway.poll_interval = poll_interval
     except ValueError as ex:
-        LOG.warning(
+        logger.warning(
             "Could not set poll interval to %f seconds: %s",
             poll_interval,
             ex,
@@ -157,15 +159,15 @@ async def options_listener(hass: HomeAssistant, entry: ConfigEntry):
     pulse_service = coordinator.adtpulse
 
     if new_poll is not None and new_poll != "":
-        LOG.info("Setting new poll interval to %f seconds", new_poll)
+        logger.info("Setting new poll interval to %f seconds", new_poll)
     else:
         new_poll = ADT_DEFAULT_POLL_INTERVAL
-        LOG.info("Re-setting poll interval to default %f seconds", new_poll)
+        logger.info("Re-setting poll interval to default %f seconds", new_poll)
     try:
         pulse_service.site.gateway.poll_interval = new_poll
         coordinator.async_set_updated_data(None)
     except ValueError as ex:
-        LOG.warning(
+        logger.warning(
             "Could not set poll interval to  %f seconds: %s",
             new_poll,
             ex,
@@ -173,27 +175,31 @@ async def options_listener(hass: HomeAssistant, entry: ConfigEntry):
 
     if new_relogin is None or new_relogin == "":
         new_relogin = ADT_DEFAULT_RELOGIN_INTERVAL
-        LOG.info("Re-setting relogin interval to default %d seconds", new_relogin)
+        logger.info("Re-setting relogin interval to default %d seconds", new_relogin)
     else:
-        LOG.info("Setting new relogin interval to %d seconds", new_relogin)
+        logger.info("Setting new relogin interval to %d seconds", new_relogin)
 
     if new_keepalive is None or new_keepalive == "":
         new_keepalive = ADT_DEFAULT_KEEPALIVE_INTERVAL
-        LOG.info("Re-setting keepalive interval to default %d seconds", new_keepalive)
+        logger.info(
+            "Re-setting keepalive interval to default %d seconds", new_keepalive
+        )
     else:
-        LOG.info("Setting new keepalive interval to %d seconds", new_keepalive)
+        logger.info("Setting new keepalive interval to %d seconds", new_keepalive)
 
     try:
         pulse_service.keepalive_interval = new_keepalive
     except ValueError as ex:
-        LOG.warning(
+        logger.warning(
             "Could not set keepalive interval to %d seconds: %s", new_keepalive, ex
         )
 
     try:
         pulse_service.relogin_interval = new_relogin
     except ValueError as ex:
-        LOG.warning("Could not set relogin interval to %d seconds: %s", new_relogin, ex)
+        logger.warning(
+            "Could not set relogin interval to %d seconds: %s", new_relogin, ex
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

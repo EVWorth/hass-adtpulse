@@ -1,8 +1,6 @@
 """Support for ADT Pulse alarm control panels."""
 
-from __future__ import annotations
-
-from logging import getLogger
+import logging
 from datetime import datetime
 from collections.abc import Coroutine
 
@@ -42,7 +40,7 @@ from .utils import (
 from .base_entity import ADTPulseEntity
 from .coordinator import ALARM_CONTEXT, ADTPulseDataUpdateCoordinator
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 ALARM_MAP = {
     ADT_ALARM_ARMING: AlarmControlPanelState.ARMING,
@@ -69,7 +67,7 @@ async def async_setup_entry(
         config.entry_id
     ]
     if not coordinator:
-        LOG.error("ADT Pulse service not initialized, cannot setup alarm platform")
+        logger.error("ADT Pulse service not initialized, cannot setup alarm platform")
         return
     site = coordinator.adtpulse.site
     migrate_entity_name(
@@ -95,7 +93,7 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
 
     def __init__(self, coordinator: ADTPulseDataUpdateCoordinator, site: ADTPulseSite):
         """Initialize the alarm control panel."""
-        LOG.debug("%s: adding alarm control panel for %s", ADTPULSE_DOMAIN, site.id)
+        logger.debug("%s: adding alarm control panel for %s", ADTPULSE_DOMAIN, site.id)
         self._name = f"ADT Alarm Panel - Site {site.id}"
         self._assumed_state: str | None = None
         super().__init__(coordinator, ALARM_CONTEXT)
@@ -147,11 +145,11 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
         self, arm_disarm_func: Coroutine[bool | None, None, bool], action: str
     ) -> None:
         result = True
-        LOG.debug("%s: Setting Alarm to %s", ADTPULSE_DOMAIN, action)
+        logger.debug("%s: Setting Alarm to %s", ADTPULSE_DOMAIN, action)
         if action != AlarmControlPanelState.DISARMED:
             await self._check_if_system_armable(action)
         if self.state == action:
-            LOG.warning("Attempting to set alarm to same state, ignoring")
+            logger.warning("Attempting to set alarm to same state, ignoring")
             return
         if not self._gateway.is_online:
             self._assumed_state = action
@@ -162,7 +160,7 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
         self.async_write_ha_state()
         result = await arm_disarm_func
         if not result:
-            LOG.warning("Could not %s ADT Pulse alarm", action)
+            logger.warning("Could not %s ADT Pulse alarm", action)
         self._assumed_state = None
         self.async_write_ha_state()
         if not result:
@@ -258,7 +256,7 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        LOG.debug(
+        logger.debug(
             "Updating Pulse alarm to %s for site %s",
             ALARM_MAP[self._site.alarm_control_panel.status],
             self._site.id,

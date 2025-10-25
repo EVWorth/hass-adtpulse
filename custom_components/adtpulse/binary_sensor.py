@@ -6,10 +6,8 @@ automatically discovers the ADT sensors configured within Pulse and
 exposes them into HA.
 """
 
-from __future__ import annotations
-
+import logging
 from typing import Any
-from logging import getLogger
 from datetime import datetime
 from collections.abc import Mapping
 
@@ -40,7 +38,7 @@ from .coordinator import (
     ADTPulseDataUpdateCoordinator,
 )
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 # please keep these alphabetized to make changes easier
 ADT_DEVICE_CLASS_TAG_MAP = {
@@ -66,7 +64,7 @@ async def async_setup_entry(
     migrate_entity_name(hass, site, "binary_sensor", get_gateway_unique_id(site))
     async_add_entities([ADTPulseGatewaySensor(coordinator, site)])
     if not site.zones_as_dict:
-        LOG.error(
+        logger.error(
             "ADT's Pulse service returned NO zones (sensors) for site %s:", site.id
         )
         return
@@ -120,7 +118,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
         # since ADT Pulse does not separate the concept of a door or window sensor,
         # we try to autodetect window type sensors so the appropriate icon is displayed
         if device_class is None:
-            LOG.warning(
+            logger.warning(
                 "Ignoring unsupported sensor type from ADT Pulse cloud "
                 "service, configured tags: %s",
                 tags,
@@ -129,7 +127,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
         if device_class == BinarySensorDeviceClass.DOOR:
             if "Window" in zone_data.name or "window" in zone_data.name:
                 device_class = BinarySensorDeviceClass.WINDOW
-        LOG.info(
+        logger.info(
             "Determined %s device class %sfrom ADT Pulse service configured tags %s",
             zone_data.name,
             device_class,
@@ -157,7 +155,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
         sensor_type = ""
         if trouble_indicator:
             sensor_type = "trouble"
-        LOG.debug(
+        logger.debug(
             "%s: adding zone %s sensor for site %s, zone %d",
             ADTPULSE_DOMAIN,
             sensor_type,
@@ -175,7 +173,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
             self._device_class = self._determine_device_class(self._my_zone)
             self._name = f"{self._my_zone.name}"
         super().__init__(coordinator, self._zone_context)
-        LOG.debug(
+        logger.debug(
             "Created ADT Pulse '%s' sensor %s - %s",
             self._device_class,
             self._zone_context,
@@ -239,7 +237,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        LOG.debug(
+        logger.debug(
             "Setting ADT Pulse %s - %s to %s at timestamp %d",
             self._zone_context,
             self._my_zone.name,
@@ -261,7 +259,7 @@ class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
             site (ADTPulseSite): ADT Pulse site object containing zones
                 and gateway info.
         """
-        LOG.debug(
+        logger.debug(
             "%s: adding gateway status sensor for site %s", ADTPULSE_DOMAIN, site.name
         )
         self._device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -326,7 +324,9 @@ class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        LOG.debug("Setting Pulse Gateway online status to %s", self._gateway.is_online)
-        LOG.debug("Gateway attributes: %s", self.extra_state_attributes)
-        LOG.debug("Gateway state: %s", self._gateway)
+        logger.debug(
+            "Setting Pulse Gateway online status to %s", self._gateway.is_online
+        )
+        logger.debug("Gateway attributes: %s", self.extra_state_attributes)
+        logger.debug("Gateway state: %s", self._gateway)
         self.async_write_ha_state()

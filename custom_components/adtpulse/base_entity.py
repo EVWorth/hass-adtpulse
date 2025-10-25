@@ -1,9 +1,7 @@
 """ADT Pulse Entity Base class."""
 
-from __future__ import annotations
-
+import logging
 from typing import Any
-from logging import getLogger
 from collections.abc import Mapping
 
 from homeassistant.core import callback
@@ -13,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import ADTPULSE_DATA_ATTRIBUTION
 from .coordinator import ADTPulseDataUpdateCoordinator
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ADTPulseEntity(CoordinatorEntity[ADTPulseDataUpdateCoordinator]):
@@ -70,6 +68,6 @@ class ADTPulseEntity(CoordinatorEntity[ADTPulseDataUpdateCoordinator]):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Call update method."""
-        LOG.debug("Scheduling update ADT Pulse entity %s", self._name)
+        logger.debug("Scheduling update ADT Pulse entity %s", self._name)
         # inform HASS that ADT Pulse data for this entity has been updated
         self.async_write_ha_state()
