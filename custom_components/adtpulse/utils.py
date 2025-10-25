@@ -5,7 +5,7 @@ from pyadtpulse.const import STATE_OK, STATE_ONLINE
 from pyadtpulse.zones import ADTPulseZoneData
 from homeassistant.core import HomeAssistant
 from homeassistant.util import slugify
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry
 
 from .const import ADTPULSE_DOMAIN
 
@@ -17,23 +17,28 @@ def migrate_entity_name(
     entity_uid: str,
 ) -> None:
     """Migrate old entity names."""
-    registry = er.async_get(hass)
+    registry = entity_registry.async_get(hass)
     if registry is None:
         return
     # this seems backwards
     entity_id = registry.async_get_entity_id(
-        platform_name,
-        ADTPULSE_DOMAIN,
-        entity_uid,
+        domain=platform_name,
+        platform=ADTPULSE_DOMAIN,
+        unique_id=entity_uid,
     )
     if entity_id is not None:
         # change has_entity_name to True and set name to None for devices
-        registry.async_update_entity(entity_id, has_entity_name=True, name=None)
+        registry.async_update_entity(
+            entity_id=entity_id,
+            has_entity_name=True,
+            name=None,
+        )
         # rename site name to site id for entities which have site name
         slugified_site_name = slugify(site.name)
         if slugified_site_name in entity_id:
             registry.async_update_entity(
-                entity_id, new_entity_id=entity_id.replace(slugified_site_name, site.id)
+                entity_id=entity_id,
+                new_entity_id=entity_id.replace(slugified_site_name, site.id),
             )
 
 

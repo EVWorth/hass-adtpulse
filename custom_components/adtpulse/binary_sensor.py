@@ -43,45 +43,64 @@ logger = logging.getLogger(__name__)
 ADT_DEVICE_CLASS_TAG_MAP = {
     "co": BinarySensorDeviceClass.CO,
     "doorWindow": BinarySensorDeviceClass.DOOR,
+    "fire": BinarySensorDeviceClass.HEAT,
     "flood": BinarySensorDeviceClass.MOISTURE,
     "garage": BinarySensorDeviceClass.GARAGE_DOOR,  # FIXME: need ADT type
-    "fire": BinarySensorDeviceClass.HEAT,
+    "glass": BinarySensorDeviceClass.SOUND,
     "motion": BinarySensorDeviceClass.MOTION,
     "smoke": BinarySensorDeviceClass.SMOKE,
-    "glass": BinarySensorDeviceClass.SOUND,
 }
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for an ADT Pulse installation."""
     coordinator: ADTPulseDataUpdateCoordinator = hass.data[ADTPULSE_DOMAIN][
         entry.entry_id
     ]
     site = coordinator.adtpulse.site
-    migrate_entity_name(hass, site, "binary_sensor", get_gateway_unique_id(site))
-    async_add_entities([ADTPulseGatewaySensor(coordinator, site)])
+
+    migrate_entity_name(
+        hass=hass,
+        site=site,
+        platform_name="binary_sensor",
+        entity_uid=get_gateway_unique_id(site),
+    )
+
+    async_add_entities(
+        [
+            ADTPulseGatewaySensor(
+                coordinator=coordinator,
+                site=site,
+            )
+        ]
+    )
     if not site.zones_as_dict:
         logger.error(
-            "ADT's Pulse service returned NO zones (sensors) for site %s:", site.id
+            "ADT's Pulse service returned NO zones (sensors) for site %s", site.id
         )
         return
     entities = [
-        ADTPulseZoneSensor(coordinator, site, zone_id, trouble_indicator)
+        ADTPulseZoneSensor(
+            coordinator=coordinator,
+            site=site,
+            zone_id=zone_id,
+            trouble_indicator=trouble_indicator,
+        )
         for zone_id in site.zones_as_dict.keys()
         for trouble_indicator in (True, False)
     ]
 
-    _ = (
+    for entity in entities:
         migrate_entity_name(
-            hass,
-            site,
-            "binary_sensor",
-            entity.unique_id,
+            hass=hass,
+            site=site,
+            platform_name="binary_sensor",
+            entity_uid=entity.unique_id,
         )
-        for entity in entities
-    )
 
     async_add_entities(entities)
 
@@ -93,7 +112,10 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
     # 'tags': ['sensor', 'motion'], 'status': 'Motion', 'activityTs': 1569078085275}
 
     @staticmethod
-    def _get_my_zone(site: ADTPulseSite, zone_id: int) -> ADTPulseZoneData:
+    def _get_my_zone(
+        site: ADTPulseSite,
+        zone_id: int,
+    ) -> ADTPulseZoneData:
         if site.zones_as_dict is None:
             raise RuntimeError("ADT pulse returned null zone")
         return site.zones_as_dict[zone_id]
@@ -109,13 +131,15 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
 
         if "sensor" in tags:
             for tag in tags:
-                try:
-                    device_class = ADT_DEVICE_CLASS_TAG_MAP[tag]
+                device_class = ADT_DEVICE_CLASS_TAG_MAP.get(tag)
+                if device_class is not None:
+                    # since ADT Pulse does not separate the concept of a door or window,
+                    # try to autodetect window type sensors to set the appropriate icon
+                    if device_class == BinarySensorDeviceClass.DOOR:
+                        if "window" in zone_data.name.lower():
+                            device_class = BinarySensorDeviceClass.WINDOW
                     break
-                except KeyError:
-                    continue
-        # since ADT Pulse does not separate the concept of a door or window sensor,
-        # we try to autodetect window type sensors so the appropriate icon is displayed
+
         if device_class is None:
             logger.warning(
                 "Ignoring unsupported sensor type from ADT Pulse cloud "
@@ -123,9 +147,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
                 tags,
             )
             raise ValueError(f"Unknown ADT Pulse device class {device_class}")
-        if device_class == BinarySensorDeviceClass.DOOR:
-            if "Window" in zone_data.name or "window" in zone_data.name:
-                device_class = BinarySensorDeviceClass.WINDOW
+
         logger.info(
             "Determined %s device class %sfrom ADT Pulse service configured tags %s",
             zone_data.name,
@@ -151,13 +173,10 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
             trouble_indicator (bool): If True, create a trouble-indicator sensor for the
                 zone instead of the normal zone sensor.
         """
-        sensor_type = ""
-        if trouble_indicator:
-            sensor_type = "trouble"
         logger.debug(
             "%s: adding zone %s sensor for site %s, zone %d",
             ADTPULSE_DOMAIN,
-            sensor_type,
+            "Trouble" if trouble_indicator else "",
             site.id,
             zone_id,
         )
@@ -170,7 +189,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
             self._zone_context += ZONE_TROUBLE_PREFIX
         else:
             self._device_class = self._determine_device_class(self._my_zone)
-            self._name = f"{self._my_zone.name}"
+            self._name = self._my_zone.name
         super().__init__(coordinator, self._zone_context)
         logger.debug(
             "Created ADT Pulse '%s' sensor %s - %s",
@@ -207,7 +226,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
         return self._device_class
 
     @property
-    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+    def extra_state_attributes(self) -> Mapping[str, Any]:
         """Return extra state attributes.
 
         currently status and last_activity_timestamp
@@ -249,7 +268,11 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
 class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
     """HASS Gateway Online Binary Sensor."""
 
-    def __init__(self, coordinator: ADTPulseDataUpdateCoordinator, site: ADTPulseSite):
+    def __init__(
+        self,
+        coordinator: ADTPulseDataUpdateCoordinator,
+        site: ADTPulseSite,
+    ):
         """Initialize gateway sensor.
 
         Args:
@@ -259,7 +282,9 @@ class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
                 and gateway info.
         """
         logger.debug(
-            "%s: adding gateway status sensor for site %s", ADTPULSE_DOMAIN, site.name
+            "%s: adding gateway status sensor for site %s",
+            ADTPULSE_DOMAIN,
+            site.name,
         )
         self._device_class = BinarySensorDeviceClass.CONNECTIVITY
         super().__init__(coordinator, "Gateway")
@@ -302,15 +327,21 @@ class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
         connection data and metadata about the ADT Pulse gateway.
         """
         mac_addresses = set()
-        for i in ("broadband_lan_mac", "device_lan_mac"):
-            if getattr(self._gateway, i) is not None:
-                mac_addresses.add((CONNECTION_NETWORK_MAC, getattr(self._gateway, i)))
+        for entry in [
+            getattr(self._gateway, value)
+            for value in (
+                "broadband_lan_mac",
+                "device_lan_mac",
+            )
+        ]:
+            if entry is not None:
+                mac_addresses.add((CONNECTION_NETWORK_MAC, entry))
         identifiers = set()
         if self._gateway.serial_number is not None:
             identifiers.add((ADTPULSE_DOMAIN, self._gateway.serial_number))
         if self._site.id is not None:
             identifiers.add((ADTPULSE_DOMAIN, get_gateway_unique_id(self._site)))
-        di = DeviceInfo(
+        return DeviceInfo(
             connections=mac_addresses,
             model=self._gateway.model,
             manufacturer=self._gateway.manufacturer,
@@ -319,13 +350,19 @@ class ADTPulseGatewaySensor(ADTPulseEntity, BinarySensorEntity):
             name="ADT Pulse Gateway",
             identifiers=identifiers,
         )
-        return di
 
     @callback
     def _handle_coordinator_update(self) -> None:
         logger.debug(
-            "Setting Pulse Gateway online status to %s", self._gateway.is_online
+            "Setting Pulse Gateway online status to %s",
+            self._gateway.is_online,
         )
-        logger.debug("Gateway attributes: %s", self.extra_state_attributes)
-        logger.debug("Gateway state: %s", self._gateway)
+        logger.debug(
+            "Gateway attributes: %s",
+            self.extra_state_attributes,
+        )
+        logger.debug(
+            "Gateway state: %s",
+            self._gateway,
+        )
         self.async_write_ha_state()
