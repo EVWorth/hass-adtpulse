@@ -27,7 +27,6 @@ from .const import ADTPULSE_DOMAIN
 from .utils import (
     zone_is_open,
     zone_is_in_trouble,
-    get_alarm_unique_id,
     migrate_entity_name,
     get_gateway_unique_id,
 )
@@ -230,7 +229,7 @@ class ADTPulseZoneSensor(ADTPulseEntity, BinarySensorEntity):
         """Return device info."""
         return DeviceInfo(
             identifiers={(ADTPULSE_DOMAIN, f"{self._site.id}-{self._my_zone.name}")},
-            via_device=(ADTPULSE_DOMAIN, get_alarm_unique_id(self._site)),
+            via_device=(ADTPULSE_DOMAIN, get_gateway_unique_id(self._site)),
             name=self._my_zone.name,
             manufacturer="ADT",
         )
