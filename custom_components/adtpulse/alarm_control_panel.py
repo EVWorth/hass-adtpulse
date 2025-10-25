@@ -22,7 +22,7 @@ from homeassistant.helpers.entity_platform import (
     AddEntitiesCallback,
     async_get_current_platform,
 )
-from homeassistant.components.alarm_control_panel.const import (
+from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
@@ -57,7 +57,9 @@ ARM_ERROR_MESSAGE = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, config: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    config: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up an alarm control panel for ADT Pulse."""
     coordinator: ADTPulseDataUpdateCoordinator = hass.data[ADTPULSE_DOMAIN][
@@ -88,7 +90,11 @@ async def async_setup_entry(
 class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     """An alarm_control_panel implementation for ADT Pulse."""
 
-    def __init__(self, coordinator: ADTPulseDataUpdateCoordinator, site: ADTPulseSite):
+    def __init__(
+        self,
+        coordinator: ADTPulseDataUpdateCoordinator,
+        site: ADTPulseSite,
+    ):
         """Initialize the alarm control panel."""
         logger.debug("%s: adding alarm control panel for %s", ADTPULSE_DOMAIN, site.id)
         self._name = f"ADT Alarm Panel - Site {site.id}"
@@ -162,7 +168,8 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
         await self._perform_alarm_action(
-            self._site.async_disarm(), AlarmControlPanelState.DISARMED
+            alarm_disarm_func=self._site.async_disarm(),
+            action=AlarmControlPanelState.DISARMED,
         )
 
     async def _check_if_system_armable(self, new_state: str) -> None:
@@ -178,13 +185,15 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send arm home command."""
         await self._perform_alarm_action(
-            self._site.async_arm_home(), AlarmControlPanelState.ARMED_HOME
+            alarm_disarm_func=self._site.async_arm_home(),
+            action=AlarmControlPanelState.ARMED_HOME,
         )
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command."""
         await self._perform_alarm_action(
-            self._site.async_arm_away(), AlarmControlPanelState.ARMED_AWAY
+            alarm_disarm_func=self._site.async_arm_away(),
+            action=AlarmControlPanelState.ARMED_AWAY,
         )
 
     # Pulse can arm away or home with bypass
@@ -198,7 +207,8 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_arm_night(self) -> None:
         """Send arm night command."""
         await self._perform_alarm_action(
-            self._site.async_arm_night(), AlarmControlPanelState.ARMED_NIGHT
+            alarm_disarm_func=self._site.async_arm_night(),
+            action=AlarmControlPanelState.ARMED_NIGHT,
         )
 
     async def async_alarm_arm_force_stay(self) -> None:
@@ -208,7 +218,8 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         use as a service call.
         """
         await self._perform_alarm_action(
-            self._site.async_arm_home(force_arm=True), AlarmControlPanelState.ARMED_HOME
+            alarm_disarm_func=self._site.async_arm_home(force_arm=True),
+            action=AlarmControlPanelState.ARMED_HOME,
         )
 
     @property
