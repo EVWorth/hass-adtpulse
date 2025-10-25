@@ -111,7 +111,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     @property
     def assumed_state(self) -> bool:
         """Return if the alarm is in an assumed state."""
-        return self._assumed_state is None
+        return self._assumed_state is not None
 
     @property
     def supported_features(self) -> AlarmControlPanelEntityFeature:
