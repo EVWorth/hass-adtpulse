@@ -4,10 +4,8 @@ import logging
 from datetime import datetime
 from collections.abc import Coroutine
 
-import homeassistant.components.alarm_control_panel as alarm
 from pyadtpulse.site import ADTPulseSite
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.util.dt import as_local
 from pyadtpulse.alarm_panel import (
     ADT_ALARM_OFF,
@@ -15,7 +13,6 @@ from pyadtpulse.alarm_panel import (
     ADT_ALARM_HOME,
     ADT_ALARM_NIGHT,
     ADT_ALARM_ARMING,
-    ADT_ALARM_UNKNOWN,
     ADT_ALARM_DISARMING,
 )
 from homeassistant.exceptions import HomeAssistantError
@@ -27,6 +24,7 @@ from homeassistant.helpers.entity_platform import (
 )
 from homeassistant.components.alarm_control_panel.const import (
     AlarmControlPanelState,
+    AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
 )
 
@@ -48,7 +46,6 @@ ALARM_MAP = {
     ADT_ALARM_DISARMING: AlarmControlPanelState.DISARMING,
     ADT_ALARM_HOME: AlarmControlPanelState.ARMED_HOME,
     ADT_ALARM_OFF: AlarmControlPanelState.DISARMED,
-    ADT_ALARM_UNKNOWN: STATE_UNAVAILABLE,
     ADT_ALARM_NIGHT: AlarmControlPanelState.ARMED_NIGHT,
 }
 
@@ -88,28 +85,22 @@ async def async_setup_entry(
     )
 
 
-class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
+class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     """An alarm_control_panel implementation for ADT Pulse."""
 
     def __init__(self, coordinator: ADTPulseDataUpdateCoordinator, site: ADTPulseSite):
         """Initialize the alarm control panel."""
         logger.debug("%s: adding alarm control panel for %s", ADTPULSE_DOMAIN, site.id)
         self._name = f"ADT Alarm Panel - Site {site.id}"
-        self._assumed_state: str | None = None
+        self._assumed_state: AlarmControlPanelState | None = None
         super().__init__(coordinator, ALARM_CONTEXT)
 
     @property
-    def state(self) -> str:
-        """Return the alarm status.
-
-        Returns:
-            str: the status
-        """
+    def alarm_state(self) -> AlarmControlPanelState | None:
+        """Return the current alarm state."""
         if self._assumed_state is not None:
             return self._assumed_state
-        if self._alarm.status in ALARM_MAP:
-            return ALARM_MAP[self._alarm.status]
-        return STATE_UNAVAILABLE
+        return ALARM_MAP.get(self._alarm.status)
 
     @property
     def assumed_state(self) -> bool:
@@ -142,13 +133,15 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
         )
 
     async def _perform_alarm_action(
-        self, arm_disarm_func: Coroutine[bool | None, None, bool], action: str
+        self,
+        arm_disarm_func: Coroutine[bool | None, None, bool],
+        action: AlarmControlPanelState,
     ) -> None:
         result = True
         logger.debug("%s: Setting Alarm to %s", ADTPULSE_DOMAIN, action)
         if action != AlarmControlPanelState.DISARMED:
             await self._check_if_system_armable(action)
-        if self.state == action:
+        if self.alarm_state == action:
             logger.warning("Attempting to set alarm to same state, ignoring")
             return
         if not self._gateway.is_online:
@@ -174,9 +167,10 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
 
     async def _check_if_system_armable(self, new_state: str) -> None:
         """Checks if we can arm the system, raises exceptions if not."""
-        if self.state != AlarmControlPanelState.DISARMED:
+        if self.alarm_state != AlarmControlPanelState.DISARMED:
             raise HomeAssistantError(
-                f"Cannot set alarm to {new_state} because currently set to {self.state}"
+                f"Cannot set alarm to {new_state} "
+                f"because currently set to {self.alarm_state}"
             )
         if not new_state == FORCE_ARM and not system_can_be_armed(self._site):
             raise HomeAssistantError(ARM_ERROR_MESSAGE)
@@ -197,7 +191,8 @@ class ADTPulseAlarm(ADTPulseEntity, alarm.AlarmControlPanelEntity):
     async def async_alarm_arm_custom_bypass(self, code: str | None = None) -> None:
         """Send force arm command."""
         await self._perform_alarm_action(
-            self._site.async_arm_away(force_arm=True), FORCE_ARM
+            alarm_disarm_func=self._site.async_arm_away(force_arm=True),
+            action=AlarmControlPanelState.ARMED_CUSTOM_BYPASS,
         )
 
     async def async_alarm_arm_night(self) -> None:
