@@ -1,8 +1,6 @@
 """ADT Pulse sensors."""
 
-from __future__ import annotations
-
-from logging import getLogger
+import logging
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant, callback
@@ -33,7 +31,7 @@ from .coordinator import (
     ADTPulseDataUpdateCoordinator,
 )
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 COORDINATOR_EXCEPTION_MAP: dict[type[Exception], tuple[str, str]] = {
     PulseAccountLockedError: ("Account Locked", "mdi:account-network-off"),
@@ -55,7 +53,9 @@ CONNECTION_STATUS_STRINGS = [value[0] for value in CONNECTION_STATUSES]
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for an ADT Pulse installation."""
     coordinator: ADTPulseDataUpdateCoordinator = hass.data[ADTPULSE_DOMAIN][
@@ -81,7 +81,7 @@ class ADTPulseConnectionStatus(SensorEntity, ADTPulseEntity):
                 HASS data update coordinator
         """
         site_name = coordinator.adtpulse.site.id
-        LOG.debug(
+        logger.debug(
             "%s: adding connection status sensor for site %s",
             ADTPULSE_DOMAIN,
             site_name,
@@ -152,7 +152,7 @@ class ADTPulseConnectionStatus(SensorEntity, ADTPulseEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        LOG.debug("Setting %s status to %s", self.name, self.native_value)
+        logger.debug("Setting %s status to %s", self.name, self.native_value)
         self.async_write_ha_state()
 
 
@@ -167,7 +167,7 @@ class ADTPulseNextRefresh(SensorEntity, ADTPulseEntity):
                 HASS data update coordinator
         """
         site_name = coordinator.adtpulse.site.id
-        LOG.debug(
+        logger.debug(
             "%s: adding next refresh sensor for site %s",
             ADTPULSE_DOMAIN,
             site_name,
@@ -228,5 +228,5 @@ class ADTPulseNextRefresh(SensorEntity, ADTPulseEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        LOG.debug("Setting %s status to %s", self.name, self.native_value)
+        logger.debug("Setting %s status to %s", self.name, self.native_value)
         self.async_write_ha_state()

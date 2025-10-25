@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
-from logging import getLogger
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
@@ -45,7 +45,7 @@ from .const import (
     CONF_KEEPALIVE_INTERVAL,
 )
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
@@ -78,7 +78,7 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
             site: ADTPulseSite = adtpulse.site
             site_id = site.id
         except Exception as ex:
-            LOG.error("ERROR VALIDATING INPUT")
+            logger.error("ERROR VALIDATING INPUT")
             raise ex
         finally:
             await adtpulse.async_logout()
@@ -156,7 +156,7 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
                 errors["base"] = "cannot_connect"
                 raise ConfigEntryNotReady from ex
             except Exception:  # pylint: disable=broad-except
-                LOG.exception("Unexpected exception")
+                logger.exception("Unexpected exception")
                 errors["base"] = "unknown"
             if not errors:
                 if not self._reauth_entry:

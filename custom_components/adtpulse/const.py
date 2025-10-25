@@ -1,7 +1,5 @@
 """ADT Pulse HA integration constants."""
 
-from __future__ import annotations
-
 ADTPULSE_DOMAIN = "adtpulse"
 CONF_FINGERPRINT = "fingerprint"
 CONF_HOSTNAME = "hostname"

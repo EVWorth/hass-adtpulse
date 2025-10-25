@@ -1,10 +1,8 @@
 """ADT Pulse Update Coordinator."""
 
-from __future__ import annotations
-
+import logging
 from typing import Any
 from asyncio import Task, CancelledError
-from logging import getLogger
 from collections.abc import Callable
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -20,7 +18,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import ADTPULSE_DOMAIN
 
-LOG = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 ALARM_CONTEXT = "Alarm"
 ZONE_CONTEXT_PREFIX = "Zone "
@@ -40,12 +38,12 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
             pulse_service (PyADTPulseAsync): ADT Pulse API service object used to
                 fetch updates and manage session state.
         """
-        LOG.debug("%s: creating update coordinator", ADTPULSE_DOMAIN)
+        logger.debug("%s: creating update coordinator", ADTPULSE_DOMAIN)
         self._adt_pulse = pulse_service
         self._update_task: Task | None = None
         super().__init__(
             hass,
-            LOG,
+            logger,
             name=ADTPULSE_DOMAIN,
         )
         self._listener_dictionary: dict[str, CALLBACK_TYPE] = {}
@@ -69,7 +67,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
         start_time = utcnow()
         if not self.data:
             super().async_update_listeners()
-            LOG.debug(
+            logger.debug(
                 "%s: async_update_listeners took %s",
                 ADTPULSE_DOMAIN,
                 utcnow() - start_time,
@@ -85,7 +83,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
             ]()
         for i in CONNECTION_STATUS_CONTEXT, NEXT_REFRESH_CONTEXT:
             self._listener_dictionary[i]()
-        LOG.debug(
+        logger.debug(
             "%s: partial async_update_listeners took %s",
             ADTPULSE_DOMAIN,
             utcnow() - start_time,
@@ -117,12 +115,12 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from ADT Pulse."""
         while not self._shutdown_requested and not self.hass.is_stopping:
             data = None
-            LOG.debug("%s: coordinator waiting for updates", ADTPULSE_DOMAIN)
+            logger.debug("%s: coordinator waiting for updates", ADTPULSE_DOMAIN)
             update_exception: Exception | None = None
             try:
                 data = await self._adt_pulse.wait_for_update()
             except PulseLoginException as ex:
-                LOG.error(
+                logger.error(
                     "%s: ADT Pulse login failed during coordinator update: %s",
                     ADTPULSE_DOMAIN,
                     ex,
@@ -132,7 +130,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                 return
             except PulseExceptionWithRetry as ex:
                 if ex.retry_time:
-                    LOG.debug(
+                    logger.debug(
                         "%s: coordinator received retryable exception will retry at %s",
                         ADTPULSE_DOMAIN,
                         as_local(utc_from_timestamp(ex.retry_time)),
@@ -140,16 +138,16 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                 update_exception = ex
             except PulseExceptionWithBackoff as ex:
                 update_exception = ex
-                LOG.debug(
+                logger.debug(
                     "%s: coordinator received backoff exception, backing off for %s seconds",  # noqa: E501
                     ADTPULSE_DOMAIN,
                     ex.backoff.get_current_backoff_interval(),
                 )
             except CancelledError:
-                LOG.debug("%s: coordinator received cancellation", ADTPULSE_DOMAIN)
+                logger.debug("%s: coordinator received cancellation", ADTPULSE_DOMAIN)
                 return
             except Exception as ex:
-                LOG.error(
+                logger.error(
                     "%s: coordinator received unknown exception %s, exiting...",
                     ADTPULSE_DOMAIN,
                     ex,
@@ -167,4 +165,6 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                     self.last_exception = None
                     self.async_set_updated_data(data)
 
-            LOG.debug("%s: coordinator received update notification", ADTPULSE_DOMAIN)
+            logger.debug(
+                "%s: coordinator received update notification", ADTPULSE_DOMAIN
+            )
