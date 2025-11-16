@@ -168,7 +168,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_disarm(),
+            arm_disarm_func=self._site.async_disarm(),
             action=AlarmControlPanelState.DISARMED,
         )
 
@@ -185,14 +185,14 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send arm home command."""
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_arm_home(),
+            arm_disarm_func=self._site.async_arm_home(),
             action=AlarmControlPanelState.ARMED_HOME,
         )
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command."""
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_arm_away(),
+            arm_disarm_func=self._site.async_arm_away(),
             action=AlarmControlPanelState.ARMED_AWAY,
         )
 
@@ -200,14 +200,14 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
     async def async_alarm_arm_custom_bypass(self, code: str | None = None) -> None:
         """Send force arm command."""
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_arm_away(force_arm=True),
+            arm_disarm_func=self._site.async_arm_away(force_arm=True),
             action=AlarmControlPanelState.ARMED_CUSTOM_BYPASS,
         )
 
     async def async_alarm_arm_night(self) -> None:
         """Send arm night command."""
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_arm_night(),
+            arm_disarm_func=self._site.async_arm_night(),
             action=AlarmControlPanelState.ARMED_NIGHT,
         )
 
@@ -218,7 +218,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         use as a service call.
         """
         await self._perform_alarm_action(
-            alarm_disarm_func=self._site.async_arm_home(force_arm=True),
+            arm_disarm_func=self._site.async_arm_home(force_arm=True),
             action=AlarmControlPanelState.ARMED_HOME,
         )
 
