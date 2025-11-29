@@ -1,6 +1,6 @@
 .venv
 .ruff_cache
-.vscode
 
-
+# No need to keep lock file in source control
+uv.lock
 
