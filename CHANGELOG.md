@@ -1,3 +1,30 @@
+## 0.7.1 (2026-03-05)
+
+* Bump integration version to `0.7.1`
+* Bump minimum Python version to `>=3.14.3`
+* Bump minimum Home Assistant version to `>=2026.3.0`
+* Bump `pyadtpulse` requirement to `>=1.2.14`
+* Update `.python-version` to `3.14.3`
+* Update tooling targets for Python 3.14 (`ruff` target `py314`, `uv` required `>=0.10.0`)
+
+## 0.7.0 (2025-10-24)
+
+* Fix inverted `assumed_state()` behavior in alarm control panel
+* Refactor alarm control panel state handling to use `AlarmControlPanelState`
+* Improve general formatting/readability across the integration
+* Fix `binary_sensor` `via_device` to reference the gateway unique ID
+* Bump minimum Home Assistant version and package version to `0.7.0`
+
+## 0.6.0 (2025-10-14)
+
+* Bump `pyadtpulse` to `1.2.12`
+* Update README ownership and project references
+* Merge small README/documentation fixes
+
+## 0.5.1 (2025-08-16)
+
+* Apply repository pre-commit updates
+
 ## 0.5.0 (2025-08-14)
 
 * Repo cleanup by @EVWorth in #60
