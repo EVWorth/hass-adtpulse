@@ -4,28 +4,21 @@ name = "hass-adtpulse"
 
 description = "Home Assistant integration for ADT Pulse"
 readme = "README.md"
-requires-python = "==3.13.2"
-version = "0.7.0"
+requires-python = ">=3.14.3"
+version = "0.7.1"
 
-dependencies = [
-    "homeassistant>=2025.10.0",
-    "pyadtpulse>=1.2.12",
-]
+dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=1.2.14"]
 
 [dependency-groups]
-dev = [
-    "commitizen>=4.8.3",
-    "pre-commit>=4.3.0",
-    "ruff>=0.12.9",
-]
+dev = ["commitizen>=4.8.3", "pre-commit>=4.3.0", "ruff>=0.12.9"]
 
 [tool.uv]
-required-version = ">=0.8.0"
+required-version = ">=0.10.0"
 
 [tool.ruff]
 line-length = 88         # Matches black
 show-fixes = true
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.format]
 docstring-code-format = true
