@@ -1,11 +1,15 @@
-## 0.7.1 (2026-03-05)
+## 0.7.2 (2026-03-05)
 
-* Bump integration version to `0.7.1`
+* Bump integration version to `0.7.2`
 * Bump minimum Python version to `>=3.14.3`
 * Bump minimum Home Assistant version to `>=2026.3.0`
 * Bump `pyadtpulse` requirement to `>=1.2.14`
 * Update `.python-version` to `3.14.3`
 * Update tooling targets for Python 3.14 (`ruff` target `py314`, `uv` required `>=0.10.0`)
+
+## 0.7.1 (2025-11-16)
+
+* Rename `alarm_disarm_func` to `arm_disarm_func`
 
 ## 0.7.0 (2025-10-24)
 

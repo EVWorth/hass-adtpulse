@@ -5,7 +5,7 @@ name = "hass-adtpulse"
 description = "Home Assistant integration for ADT Pulse"
 readme = "README.md"
 requires-python = ">=3.14.3"
-version = "0.7.1"
+version = "0.7.2"
 
 dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=1.2.14"]
 
