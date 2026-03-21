@@ -1,3 +1,7 @@
+## 0.7.3 (2026-03-21)
+
+* Fix missing `code` parameter in `async_alarm_arm_night` causing crash when arming to Night mode on HA 2025.8+
+
 ## 0.7.2 (2026-03-05)
 
 * Bump integration version to `0.7.2`
