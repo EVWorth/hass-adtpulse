@@ -204,7 +204,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
             action=AlarmControlPanelState.ARMED_CUSTOM_BYPASS,
         )
 
-    async def async_alarm_arm_night(self) -> None:
+    async def async_alarm_arm_night(self, code: str | None = None) -> None:
         """Send arm night command."""
         await self._perform_alarm_action(
             arm_disarm_func=self._site.async_arm_night(),
