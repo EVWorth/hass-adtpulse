@@ -15,7 +15,7 @@
       },
       "mfa": {
         "title": "Enter verification code",
-        "description": "ADT Pulse sent a verification code to the contact on your account. Enter it to finish signing in. Home Assistant will be added to your trusted devices so it is not asked for again.",
+        "description": "ADT Pulse sent a verification code to the contact on your account. Enter it to finish signing in. Home Assistant will also try to add itself to your trusted devices, so you are asked less often.",
         "data": {
           "code": "Verification code"
         }

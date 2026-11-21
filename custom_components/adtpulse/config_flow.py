@@ -64,32 +64,21 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
     """Handle a config flow for ADT Pulse."""
 
     @staticmethod
-    async def validate_input(data: dict[str, str]) -> dict[str, str]:
-        """Validate form input.
-
-        Args:
-            hass (core.HomeAssistant): hass object
-            data (Dict): voluptuous Schema
+    async def validate_input(adtpulse: PyADTPulseAsync) -> dict[str, str]:
+        """Validate form input by logging in with it.
 
         Raises:
+            PulseMFARequiredError: MFA is needed; the session is kept so the
+                login can be finished with a code
             CannotConnect: Cannot connect to ADT Pulse site
             InvalidAuth: login failed
 
         Returns:
-            Dict[str, str | bool]: "title" : username used to validate
-                                "login result": True if login succeeded
+            Dict[str, str]: "title" : the entry title
         """
-        adtpulse = PyADTPulseAsync(
-            data[CONF_USERNAME],
-            data[CONF_PASSWORD],
-            data[CONF_FINGERPRINT],
-            service_host=data[CONF_HOSTNAME],
-        )
         try:
             await adtpulse.async_login()
-        except PulseMFARequiredError as ex:
-            # keep the session: the login can be finished with a code
-            ex.adtpulse = adtpulse  # type: ignore[attr-defined]
+        except PulseMFARequiredError:
             raise
         except Exception:
             logger.error("ERROR VALIDATING INPUT")
@@ -165,11 +154,17 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
         errors = info = {}
         if user_input is not None:
             try:
-                info = await self.validate_input(user_input)
+                # raises ValueError for input it rejects, such as a bad email
+                adtpulse = PyADTPulseAsync(
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
+                    user_input[CONF_FINGERPRINT],
+                    service_host=user_input[CONF_HOSTNAME],
+                )
+                info = await self.validate_input(adtpulse)
             except PulseAuthenticationError:
                 errors["base"] = "invalid_auth"
             except PulseMFARequiredError as ex:
-                adtpulse: PyADTPulseAsync = ex.adtpulse  # type: ignore[attr-defined]
                 if ex.challenge is None:
                     await _async_logout_quietly(adtpulse)
                     errors["base"] = "mfa_required"
@@ -228,6 +223,13 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
         self._mfa_input = user_input
         return await self.async_step_mfa()
 
+    @callback
+    def async_remove(self) -> None:
+        """Log out a pending MFA session when the flow is closed."""
+        if self._mfa_pulse is not None:
+            self.hass.async_create_task(_async_logout_quietly(self._mfa_pulse))
+            self._mfa_pulse = None
+
     async def async_step_mfa(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -241,16 +243,21 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
                 info = await self._finish_validation(self._mfa_pulse)
             except PulseAuthenticationError:
                 errors["base"] = "invalid_mfa_code"
-            except Exception:  # pylint: disable=broad-except
+            except Exception as ex:  # pylint: disable=broad-except
                 # the code may already be spent, so start over
                 logger.exception("Unexpected exception finishing MFA login")
                 adtpulse, input_data = self._mfa_pulse, self._mfa_input
                 self._mfa_pulse = self._mfa_input = None
                 await _async_logout_quietly(adtpulse)
+                error = (
+                    "cannot_connect"
+                    if isinstance(ex, PulseConnectionError)
+                    else "unknown"
+                )
                 return self.async_show_form(
                     step_id="user",
                     data_schema=self._get_data_schema(input_data),
-                    errors={"base": "unknown"},
+                    errors={"base": error},
                 )
             else:
                 data = self._mfa_input
