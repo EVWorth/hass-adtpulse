@@ -44,6 +44,7 @@ from .const import (
     CONF_RELOGIN_INTERVAL,
     CONF_KEEPALIVE_INTERVAL,
 )
+from .fingerprint import generate_fingerprint
 
 CONF_MFA_CODE = "code"
 # the name the fingerprint is trusted under in the ADT Pulse account
@@ -109,9 +110,6 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
                     CONF_PASSWORD, default=orig_input.get(CONF_PASSWORD, "")
                 ): cv.string,
                 vol.Required(
-                    CONF_FINGERPRINT, default=orig_input.get(CONF_FINGERPRINT, "")
-                ): cv.string,
-                vol.Required(
                     CONF_HOSTNAME, default=orig_input.get(CONF_HOSTNAME, "")
                 ): vol.In([DEFAULT_API_HOST, API_HOST_CA]),
             }
@@ -153,6 +151,16 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
         # `validate_input` above.
         errors = info = {}
         if user_input is not None:
+            if not user_input.get(CONF_FINGERPRINT):
+                # keep the fingerprint ADT may already trust; a new one gets
+                # trusted after the verification code
+                fingerprint = None
+                if self._reauth_entry is not None:
+                    fingerprint = self._reauth_entry.data.get(CONF_FINGERPRINT)
+                user_input = {
+                    **user_input,
+                    CONF_FINGERPRINT: fingerprint or generate_fingerprint(),
+                }
             try:
                 # raises ValueError for input it rejects, such as a bad email
                 adtpulse = PyADTPulseAsync(

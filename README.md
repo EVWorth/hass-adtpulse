@@ -29,9 +29,9 @@ This platform supports the following services:
 * `alarm_arm_custom_bypass`
 
 
-## WARNING: ADT Accounts with 2FA May Not Work
+## Two-factor authentication
 
-As of August 29, 2021 ADT Pulse has had 2FA added and is currently required for all ADT Pulse access. This breaks any integration that relies on logging in with a user and password.  Because of this, a separate username/password should be created exclusively for Home Assistant login.  A browser fingerprint is used by Pulse to indicate when a user "saves" the browser via 2FA.  Details on obtaining this fingerprint is given below.
+ADT Pulse asks for a verification code when it sees a new device. During setup or reauthentication, Home Assistant asks ADT to send the code to the contact on your account, then asks you to enter it. It then tries to add itself to your trusted devices as "Home Assistant", so later logins do not need a code.
 
 
 ## Installation
@@ -46,26 +46,9 @@ Note: Manual installation by direct download and copying is not supported, if yo
 
 ### Step 2: Configure ADT Pulse
 
-To enable ADT Pulse, add `ADT Pulse` from HA Settings -> Integrations -> Add Integration. Input the necessary details including username, password, fingerprint (please see the below step "Step to Get Your Trusted Device") and select the URL and frequency for updates.
+To enable ADT Pulse, add `ADT Pulse` from HA Settings -> Integrations -> Add Integration. Enter your username and password and select the URL. If ADT asks for a verification code, Home Assistant shows a second step to enter it.
 
-#### Step to Get Your Trusted Device
-
-**<ins>Important:</ins>** If you are logged into ADT Pulse with the same fingerprint, the first login will be logged out when the second login is attempted.  For this reason it is recommended that you not use the same machine/browser that you would normally use for logging into Pulse when you generate the fingerprint.
-
-1. Go to the ADT Pulse Login page but do not login.
-2. Open up the developer tools for your browser and make sure you enable the network capturing option and recording is enabled
-3. Login to your account.
-4. If the device isn't trusted, it will prompt you for a code, afterwards you will be asked if you want to trust the device. Give it a name and click Save and Continue.
-
-![ADT Save Device](https://github.com/EVWorth/hass-adtpulse/blob/main/docs/adt_save_device.jpg?raw=true)
-
-5. Get the fingerprint. There are 2 ways to do this:
-
-   - Using the same browser you used to authenticate with ADT Pulse, navigate to [this page](https://rawcdn.githack.com/homeassistant-projects/pyadtpulse/5fe719d2bea2b6e68aec0588c4d92f363223424d/doc/browser_fingerprint.html) It will show you the browser fingerprint and allow you to copy it to your clipboard. If this doesn't work, try the next step.
-
-   - Open up the developer tools and look for the page called "signin.jsp". Under the form data, look for "fingerprint". Copy that value and use it for the device_id value in your configuration.yaml file. If for some reason you didn't record, just re-login to your account again with the same browser.
-
-![ADT Form Data](https://github.com/EVWorth/hass-adtpulse/blob/main/docs/adt_form_data.jpg?raw=true)
+Home Assistant creates its own browser fingerprint, the value ADT uses to recognize a trusted device; you no longer need to copy one from a browser.
 
 
 ## Options

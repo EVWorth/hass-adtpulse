@@ -5,7 +5,6 @@
         "data": {
           "username": "Username",
           "password": "Password",
-          "fingerprint": "Browser Fingerprint",
           "hostname": "ADT Pulse Hostname"
         }
       },
