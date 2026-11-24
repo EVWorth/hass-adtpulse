@@ -2,7 +2,7 @@
 
 Home Assistant integration for [ADT Pulse](https://portal.adtpulse.com/) security systems for both alarming/disarming, as well as sensor status (motion, door, window, etc).
 
-![beta_badge](https://img.shields.io/badge/maturity-Beta-yellow.png)
+![maturity_badge](https://img.shields.io/badge/maturity-Stable-green.png)
 ![release_badge](https://img.shields.io/github/v/release/EVWorth/hass-adtpulse.svg)
 ![release_date](https://img.shields.io/github/release-date/EVWorth/hass-adtpulse.svg)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
