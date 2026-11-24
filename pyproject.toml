@@ -17,10 +17,20 @@ dev = [
     # Keep it in sync with the ruff-pre-commit rev in .pre-commit-config.yaml.
     "ruff==0.17.6",
 ]
-test = ["pytest-homeassistant-custom-component"]
+test = [
+    # The plugin pins an exact homeassistant. Without a floor, a homeassistant
+    # release the plugin doesn't support yet makes uv fall back to an ancient
+    # plugin (0.2.1, pytest 6), which can't run on Python 3.14.
+    "pytest-homeassistant-custom-component>=0.13.375",
+]
 
 [tool.uv]
 required-version = ">=0.10.0"
+# Skip releases younger than 2 days (matches Dependabot's cooldown). To try a
+# brand-new release anyway: uv lock --exclude-newer-package "NAME=0 days"
+exclude-newer = "2 days"
+# pyadtpulse is ours, and a release often needs this repo to follow it at once.
+exclude-newer-package = { pyadtpulse = false }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

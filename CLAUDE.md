@@ -17,7 +17,11 @@ uv run pre-commit install        # once per clone (also installs the commit-msg 
 uv run cz bump --dry-run --yes   # preview the next automatic release
 ```
 
-`uv.lock` is gitignored, so `uv sync` resolves fresh each time.
+`uv.lock` is gitignored, so `uv sync` resolves fresh each time, skipping
+releases younger than 2 days (`exclude-newer` in `[tool.uv]`; pyadtpulse is
+exempt). `pytest-homeassistant-custom-component` pins an exact
+`homeassistant`, so keep its floor in the `test` group: without one, a new
+Home Assistant release makes uv fall back to a plugin too old to run.
 
 ## Layout
 
