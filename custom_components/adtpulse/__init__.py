@@ -21,6 +21,8 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
 )
 from pyadtpulse.exceptions import (
+    PulseConnectionError,
+    PulseMFARequiredError,
     PulseAccountLockedError,
     PulseAuthenticationError,
     PulseGatewayOfflineError,
@@ -112,7 +114,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[ADTPULSE_DOMAIN][entry.entry_id] = service
     try:
         await service.async_login()
-    except PulseAuthenticationError as ex:
+    except (PulseAuthenticationError, PulseMFARequiredError) as ex:
+        # re-authentication asks for a verification code when ADT wants one
         logger.error("Unable to connect to ADT Pulse: %s", ex)
         raise ConfigEntryAuthFailed(
             f"{ADTPULSE_DOMAIN} could not log in due to a protocol error"
@@ -121,13 +124,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         PulseAccountLockedError,
         PulseServiceTemporarilyUnavailableError,
         PulseGatewayOfflineError,
+        PulseConnectionError,
     ) as ex:
+        # Home Assistant retries setup with backoff
         logger.error("Unable to connect to ADT Pulse: %s", ex)
         raise ConfigEntryNotReady(
             f"{ADTPULSE_DOMAIN} could not log in due to service unavailability"
         ) from ex
 
-    if service.sites is None:
+    if service.site is None:
         logger.error("%s could not retrieve any sites", ADTPULSE_DOMAIN)
         raise ConfigEntryNotReady(f"{ADTPULSE_DOMAIN} could not retrieve any sites")
     try:
