@@ -4,3 +4,4 @@
 # No need to keep lock file in source control
 uv.lock
 
+.vscode

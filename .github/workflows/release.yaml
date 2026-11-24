@@ -1,0 +1,80 @@
+name: Release
+
+# Every push to main is checked for releasable commits. Commitizen reads the
+# conventional commits since the last tag (feat -> minor, fix/perf/refactor ->
+# patch; while the version is 0.x, a breaking change is also a minor); if
+# there are any, it bumps the version in pyproject.toml and manifest.json,
+# updates CHANGELOG.md, commits, tags and pushes, then creates the GitHub
+# release that HACS offers to users. docs/ci/build/chore/test commits don't
+# release.
+#
+# The bump commit and tag are pushed with GITHUB_TOKEN, which never triggers
+# other workflow runs, so this doesn't loop.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/tests.yaml
+
+  release:
+    name: Bump version and release
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the bump commit and tag, create the GitHub release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # commitizen needs the tags and history
+          persist-credentials: true # needed to push the bump commit
+
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: false
+
+      - name: Bump version
+        id: bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Same commitizen version as the dev group in pyproject.toml.
+          cz() { uvx --from "commitizen==4.19.4" cz "$@"; }
+          # PRs merged back to back start overlapping runs. Only the run for
+          # main's newest commit releases (its bump covers every commit); an
+          # older one would only fail on a non-fast-forward push.
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "main has moved past $GITHUB_SHA; the newer run releases."
+            exit 0
+          fi
+          before=$(cz version --project)
+          # Exit code 21 = no commits that warrant a release.
+          cz --no-raise 21 bump --yes
+          after=$(cz version --project)
+          if [ "$before" = "$after" ]; then
+            echo "Nothing to release."
+            exit 0
+          fi
+          git push --atomic origin HEAD:main "$after"
+          echo "tag=$after" >> "$GITHUB_OUTPUT"
+
+      # Release notes are the section cz bump just wrote to CHANGELOG.md.
+      - name: Create GitHub release
+        if: steps.bump.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          awk -v v="$TAG" '$0 ~ "^## " v " " {f=1; next} f && /^## / {exit} f' CHANGELOG.md > release-notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file release-notes.md

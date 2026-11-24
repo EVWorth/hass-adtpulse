@@ -10,7 +10,13 @@ version = "0.8.0"
 dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=2.0.0"]
 
 [dependency-groups]
-dev = ["commitizen>=4.8.3", "pre-commit>=4.3.0", "ruff>=0.12.9"]
+dev = [
+    "commitizen==4.19.4",
+    "pre-commit>=4.3.0",
+    # Exact pin: ruff-action in the Validate workflow installs this version.
+    # Keep it in sync with the ruff-pre-commit rev in .pre-commit-config.yaml.
+    "ruff==0.17.6",
+]
 test = ["pytest-homeassistant-custom-component"]
 
 [tool.uv]
@@ -64,9 +70,14 @@ section-order = [
 convention = "google"
 
 [tool.commitizen]
+# Releases are cut automatically from conventional commits on main: see
+# .github/workflows/release.yaml. feat -> minor, fix/perf/refactor -> patch;
+# docs/ci/build/chore/test don't release.
 name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "pep440"
-version_provider = "uv"
+version_provider = "pep621"     # [project].version, plus version_files below
+version_files = ["custom_components/adtpulse/manifest.json:\"version\""]
+tag_format = "$version"          # existing tags are 0.8.0 etc., no "v"
 update_changelog_on_bump = true
+changelog_incremental = true     # keep the hand-written history below new entries
+bump_message = "bump: version $current_version → $new_version"
 major_version_zero = true
