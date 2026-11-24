@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.14.3"
 version = "0.8.1"
 
-dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=2.0.0"]
+dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=3.0.0"]
 
 [dependency-groups]
 dev = [
@@ -90,4 +90,3 @@ tag_format = "$version"          # existing tags are 0.8.0 etc., no "v"
 update_changelog_on_bump = true
 changelog_incremental = true     # keep the hand-written history below new entries
 bump_message = "bump: version $current_version → $new_version"
-major_version_zero = true

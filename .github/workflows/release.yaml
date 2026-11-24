@@ -2,11 +2,15 @@ name: Release
 
 # Every push to main is checked for releasable commits. Commitizen reads the
 # conventional commits since the last tag (feat -> minor, fix/perf/refactor ->
-# patch; while the version is 0.x, a breaking change is also a minor); if
+# patch, a breaking change -> major); if
 # there are any, it bumps the version in pyproject.toml and manifest.json,
 # updates CHANGELOG.md, commits, tags and pushes, then creates the GitHub
 # release that HACS offers to users. docs/ci/build/chore/test commits don't
 # release.
+#
+# To choose the version instead (to declare 1.0.0, say), put a
+# "Release-As: X.Y.Z" trailer in a commit message. The newest such trailer
+# since the last tag wins.
 #
 # The bump commit and tag are pushed with GITHUB_TOKEN, which never triggers
 # other workflow runs, so this doesn't loop.
@@ -59,8 +63,16 @@ jobs:
             exit 0
           fi
           before=$(cz version --project)
-          # Exit code 21 = no commits that warrant a release.
-          cz --no-raise 21 bump --yes
+          last_tag=$(git describe --tags --abbrev=0)
+          release_as=$(git log --format='%(trailers:key=Release-As,valueonly)' "$last_tag..HEAD" \
+            | grep -m1 -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          if [ -n "$release_as" ]; then
+            echo "Release-As trailer: releasing $release_as."
+            cz bump --yes "$release_as"
+          else
+            # Exit code 21 = no commits that warrant a release.
+            cz --no-raise 21 bump --yes
+          fi
           after=$(cz version --project)
           if [ "$before" = "$after" ]; then
             echo "Nothing to release."

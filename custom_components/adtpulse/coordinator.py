@@ -144,7 +144,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
             logger.debug("%s: coordinator waiting for updates", ADTPULSE_DOMAIN)
             update_exception: Exception | None = None
             try:
-                data = await self._adt_pulse.wait_for_update()
+                data = await self._adt_pulse.async_wait_for_update()
             except (PulseAuthenticationError, PulseMFARequiredError) as ex:
                 update_exception = ex
                 self._start_reauth(ex)
@@ -231,7 +231,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                 didn't, the loop tries again.
         """
         try:
-            await self._relogin_backoff.wait_for_backoff()
+            await self._relogin_backoff.async_wait_for_backoff()
             await self._adt_pulse.async_login()
         except CancelledError:
             logger.debug("%s: coordinator received cancellation", ADTPULSE_DOMAIN)
@@ -254,7 +254,7 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
             self._relogin_backoff.increment_backoff()
             if isinstance(ex, PulseExceptionWithRetry):
                 try:
-                    await ex.backoff.wait_for_backoff()
+                    await ex.backoff.async_wait_for_backoff()
                 except CancelledError:
                     return False
             return True
