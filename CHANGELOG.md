@@ -1,3 +1,9 @@
+## 0.8.1 (2026-11-24)
+
+### Fix
+
+- log back in when the Pulse session drops instead of asking to reauthenticate
+
 ## 0.8.0 (2026-11-24)
 
 * Ask for the ADT Pulse verification code during setup and re-authentication, instead of a browser fingerprint (#12). The design and fingerprint format come from @jra3's #17.
