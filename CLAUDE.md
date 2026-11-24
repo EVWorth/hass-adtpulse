@@ -73,5 +73,6 @@ Home Assistant release makes uv fall back to a plugin too old to run.
   `CHANGELOG.md`, tags `X.Y.Z` and creates the GitHub release HACS installs.
   So pick the type for what users get, and never edit the version or the
   changelog by hand. Validate rejects non-conventional commits in PRs.
-- While the version is 0.x, a breaking change bumps the minor
-  (`major_version_zero`).
+- A breaking change (`!` or a `BREAKING CHANGE:` footer) releases a new
+  major. To pick the version yourself, add a `Release-As: X.Y.Z` trailer to a
+  commit message; the release uses the newest one since the last tag.
