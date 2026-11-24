@@ -5,15 +5,20 @@ name = "hass-adtpulse"
 description = "Home Assistant integration for ADT Pulse"
 readme = "README.md"
 requires-python = ">=3.14.3"
-version = "0.7.2"
+version = "0.8.0"
 
-dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=1.2.14"]
+dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=2.0.0"]
 
 [dependency-groups]
 dev = ["commitizen>=4.8.3", "pre-commit>=4.3.0", "ruff>=0.12.9"]
+test = ["pytest-homeassistant-custom-component"]
 
 [tool.uv]
 required-version = ">=0.10.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88         # Matches black

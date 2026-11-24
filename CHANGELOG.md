@@ -1,3 +1,11 @@
+## 0.8.0 (2026-11-24)
+
+* Ask for the ADT Pulse verification code during setup and re-authentication, instead of a browser fingerprint (#12). The design and fingerprint format come from @jra3's #17.
+* Retry setup when the network or DNS fails during login, instead of failing permanently (#15)
+* Keep updating when ADT reports an `unknown` alarm status, instead of stopping all updates (#14)
+* Fix force arm (`force_stay`, `force_away` and arm custom bypass) being refused when a zone is open (#16)
+* Require `pyadtpulse>=2.0.0`
+
 ## 0.7.3 (2026-03-21)
 
 * Fix missing `code` parameter in `async_alarm_arm_night` causing crash when arming to Night mode on HA 2025.8+

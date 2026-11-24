@@ -7,7 +7,6 @@ from typing import Any
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from pyadtpulse.site import ADTPulseSite
 from pyadtpulse.const import (
     API_HOST_CA,
     DEFAULT_API_HOST,
@@ -27,7 +26,6 @@ from pyadtpulse.exceptions import (
     PulseGatewayOfflineError,
     PulseServiceTemporarilyUnavailableError,
 )
-from homeassistant.exceptions import ConfigEntryNotReady
 from pyadtpulse.pyadtpulse_async import PyADTPulseAsync
 from homeassistant.config_entries import (
     CONN_CLASS_CLOUD_PUSH,
@@ -44,51 +42,38 @@ from .const import (
     CONF_RELOGIN_INTERVAL,
     CONF_KEEPALIVE_INTERVAL,
 )
+from .fingerprint import generate_fingerprint
+
+CONF_MFA_CODE = "code"
+# the name the fingerprint is trusted under in the ADT Pulse account
+MFA_DEVICE_NAME = "Home Assistant"
 
 logger = logging.getLogger(__name__)
+
+
+async def _async_logout_quietly(adtpulse: PyADTPulseAsync) -> None:
+    """Log out a session the flow is abandoning; a failure must not block the form."""
+    try:
+        await adtpulse.async_logout()
+    except Exception:
+        logger.debug("Could not log out an abandoned ADT Pulse session", exc_info=True)
 
 
 class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
     """Handle a config flow for ADT Pulse."""
 
-    @staticmethod
-    async def validate_input(data: dict[str, str]) -> dict[str, str]:
-        """Validate form input.
+    VERSION = 1
+    CONNECTION_CLASS = CONN_CLASS_CLOUD_PUSH
 
-        Args:
-            hass (core.HomeAssistant): hass object
-            data (Dict): voluptuous Schema
-
-        Raises:
-            CannotConnect: Cannot connect to ADT Pulse site
-            InvalidAuth: login failed
-
-        Returns:
-            Dict[str, str | bool]: "title" : username used to validate
-                                "login result": True if login succeeded
-        """
-        adtpulse = PyADTPulseAsync(
-            data[CONF_USERNAME],
-            data[CONF_PASSWORD],
-            data[CONF_FINGERPRINT],
-            service_host=data[CONF_HOSTNAME],
-        )
-        try:
-            await adtpulse.async_login()
-            site: ADTPulseSite = adtpulse.site
-            site_id = site.id
-        except Exception as ex:
-            logger.error("ERROR VALIDATING INPUT")
-            raise ex
-        finally:
-            await adtpulse.async_logout()
-        return {"title": f"ADT: Site {site_id}"}
+    _reauth_entry: ConfigEntry | None = None
+    _mfa_pulse: PyADTPulseAsync | None = None
+    _mfa_input: dict[str, Any] | None = None
 
     @staticmethod
     def _get_data_schema(orig_input: dict[str, Any] | None) -> vol.Schema:
         if orig_input is None:
             orig_input = {}
-        DATA_SCHEMA = vol.Schema(
+        return vol.Schema(
             {
                 vol.Required(
                     CONF_USERNAME, default=orig_input.get(CONF_USERNAME, "")
@@ -97,14 +82,11 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
                     CONF_PASSWORD, default=orig_input.get(CONF_PASSWORD, "")
                 ): cv.string,
                 vol.Required(
-                    CONF_FINGERPRINT, default=orig_input.get(CONF_FINGERPRINT, "")
-                ): cv.string,
-                vol.Required(
-                    CONF_HOSTNAME, default=orig_input.get(CONF_HOSTNAME, "")
+                    CONF_HOSTNAME,
+                    default=orig_input.get(CONF_HOSTNAME, DEFAULT_API_HOST),
                 ): vol.In([DEFAULT_API_HOST, API_HOST_CA]),
             }
         )
-        return DATA_SCHEMA
 
     @staticmethod
     @callback
@@ -114,15 +96,22 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
         """Create the options flow."""
         return PulseOptionsFlowHandler(config_entry)
 
-    VERSION = 1
-    CONNECTION_CLASS = CONN_CLASS_CLOUD_PUSH
+    def _with_fingerprint(self, user_input: dict[str, Any]) -> dict[str, Any]:
+        """Add the fingerprint to log in with.
 
-    _reauth_entry: ConfigEntry | None = None
+        Re-authentication keeps the entry's fingerprint, which ADT may already
+        trust. A new entry gets a new one, which is trusted after the
+        verification code.
+        """
+        fingerprint = None
+        if self._reauth_entry is not None:
+            fingerprint = self._reauth_entry.data.get(CONF_FINGERPRINT)
+        return {**user_input, CONF_FINGERPRINT: fingerprint or generate_fingerprint()}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step.
+        """Ask for the account, log in with it, and ask for a code if ADT wants one.
 
         Args:
             user_input (Optional[Dict[str, Any]], optional): user input.
@@ -131,60 +120,132 @@ class PulseConfigFlow(ConfigFlow, domain=ADTPULSE_DOMAIN):  # type: ignore
         Returns:
             FlowResult: the flow result
         """
-        # This goes through the steps to take the user through the setup process.
-        # Using this it is possible to update the UI and prompt for additional
-        # information. This example provides a single form (built from `DATA_SCHEMA`),
-        # and when that has some validated input, it calls `async_create_entry` to
-        # actually create the HA config entry. Note the "title" value is returned by
-        # `validate_input` above.
-        errors = info = {}
+        errors: dict[str, str] = {}
         if user_input is not None:
+            user_input = self._with_fingerprint(user_input)
             try:
-                info = await self.validate_input(user_input)
-            except PulseAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except PulseMFARequiredError:
-                errors["base"] = "mfa_required"
-            except (
-                PulseAccountLockedError,
-                PulseGatewayOfflineError,
-                PulseServiceTemporarilyUnavailableError,
-            ) as ex:
-                errors["base"] = "service_unavailable"
-                raise ConfigEntryNotReady from ex
-            except PulseConnectionError as ex:
-                errors["base"] = "cannot_connect"
-                raise ConfigEntryNotReady from ex
-            except Exception:  # pylint: disable=broad-except
-                logger.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            if not errors:
-                if not self._reauth_entry:
-                    return super().async_create_entry(
-                        title=info["title"], data=user_input
-                    )
-                self.hass.config_entries.async_update_entry(
-                    self._reauth_entry, title=info["title"], data=user_input
+                # raises ValueError for input it rejects, such as a bad email
+                adtpulse = PyADTPulseAsync(
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
+                    user_input[CONF_FINGERPRINT],
+                    service_host=user_input[CONF_HOSTNAME],
                 )
-                await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
+            except ValueError:
+                errors["base"] = "invalid_auth"
+            else:
+                try:
+                    await adtpulse.async_login()
+                except PulseMFARequiredError as ex:
+                    if ex.challenge is not None:
+                        return await self._async_start_mfa(adtpulse, user_input)
+                    errors["base"] = "mfa_required"
+                except PulseAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except (
+                    PulseAccountLockedError,
+                    PulseGatewayOfflineError,
+                    PulseServiceTemporarilyUnavailableError,
+                ):
+                    errors["base"] = "service_unavailable"
+                except PulseConnectionError:
+                    errors["base"] = "cannot_connect"
+                except Exception:
+                    logger.exception("Unexpected exception")
+                    errors["base"] = "unknown"
+                else:
+                    return await self._async_save_entry(adtpulse, user_input)
+                await _async_logout_quietly(adtpulse)
 
-        # If there is no user input or there were errors, show the form again,
-        # including any errors that were found with the input.
-        if user_input is None:
-            user_input = self.init_data
         return self.async_show_form(
             step_id="user", data_schema=self._get_data_schema(user_input), errors=errors
         )
 
-    async def async_step_reauth(self, user_input=None):
+    async def _async_save_entry(
+        self, adtpulse: PyADTPulseAsync, user_input: dict[str, Any]
+    ) -> FlowResult:
+        """Read the site from a logged-in session, log it out and save the entry."""
+        try:
+            title = f"ADT: Site {adtpulse.site.id}"
+        finally:
+            await _async_logout_quietly(adtpulse)
+        if self._reauth_entry is None:
+            return self.async_create_entry(title=title, data=user_input)
+        return self.async_update_reload_and_abort(
+            self._reauth_entry, title=title, data=user_input
+        )
+
+    async def _async_start_mfa(
+        self, adtpulse: PyADTPulseAsync, user_input: dict[str, Any]
+    ) -> FlowResult:
+        """Send a verification code and ask for it."""
+        try:
+            await adtpulse.async_request_mfa_code()
+        except Exception:
+            logger.exception("Could not request an ADT Pulse verification code")
+            await _async_logout_quietly(adtpulse)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=self._get_data_schema(user_input),
+                errors={"base": "mfa_code_not_sent"},
+            )
+        self._mfa_pulse = adtpulse
+        self._mfa_input = user_input
+        return await self.async_step_mfa()
+
+    @callback
+    def async_remove(self) -> None:
+        """Log out a pending MFA session when the flow is closed."""
+        if self._mfa_pulse is not None:
+            self.hass.async_create_task(_async_logout_quietly(self._mfa_pulse))
+            self._mfa_pulse = None
+
+    async def async_step_mfa(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Finish a login that needs MFA with the code ADT Pulse sent."""
+        errors: dict[str, str] = {}
+        if user_input is not None and self._mfa_pulse and self._mfa_input:
+            adtpulse, data = self._mfa_pulse, self._mfa_input
+            try:
+                await adtpulse.async_complete_mfa_login(
+                    user_input[CONF_MFA_CODE].strip(), device_name=MFA_DEVICE_NAME
+                )
+            except PulseAuthenticationError:
+                errors["base"] = "invalid_mfa_code"
+            except Exception as ex:
+                # the code may already be spent, so start over
+                logger.exception("Unexpected exception finishing MFA login")
+                self._mfa_pulse = self._mfa_input = None
+                await _async_logout_quietly(adtpulse)
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=self._get_data_schema(data),
+                    errors={
+                        "base": "cannot_connect"
+                        if isinstance(ex, PulseConnectionError)
+                        else "unknown"
+                    },
+                )
+            else:
+                self._mfa_pulse = self._mfa_input = None
+                return await self._async_save_entry(adtpulse, data)
+        return self.async_show_form(
+            step_id="mfa",
+            data_schema=vol.Schema({vol.Required(CONF_MFA_CODE): cv.string}),
+            errors=errors,
+        )
+
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> FlowResult:
         """Perform reauth upon an API authentication error."""
         self._reauth_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
         )
-        return await self.async_step_reauth_confirm(user_input)
+        return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(self, user_input=None):
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         """Dialog that informs the user that reauth is required."""
         if user_input is None:
             orig_input = {}
