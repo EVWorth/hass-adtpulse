@@ -1,4 +1,4 @@
-## 0.8.0 (unreleased)
+## 0.8.0 (2026-11-24)
 
 * Ask for the ADT Pulse verification code during setup and re-authentication, instead of a browser fingerprint (#12). The design and fingerprint format come from @jra3's #17.
 * Retry setup when the network or DNS fails during login, instead of failing permanently (#15)
