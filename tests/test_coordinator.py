@@ -45,15 +45,15 @@ async def test_failing_listener_does_not_stop_the_others(hass):
 def _run_coordinator(hass, waits, logins=()):
     """Return a coordinator whose client yields `waits`, then is cancelled.
 
-    `waits` are what successive wait_for_update() calls return or raise, and
+    `waits` are what successive async_wait_for_update() calls return or raise, and
     `logins` what successive async_login() calls raise (None for success).
     """
     pulse = MagicMock()
-    pulse.wait_for_update = AsyncMock(side_effect=[*waits, CancelledError()])
+    pulse.async_wait_for_update = AsyncMock(side_effect=[*waits, CancelledError()])
     pulse.async_login = AsyncMock(side_effect=list(logins) or None)
     coordinator = ADTPulseDataUpdateCoordinator(hass, pulse)
     coordinator.config_entry = MagicMock()
-    coordinator._relogin_backoff = MagicMock(wait_for_backoff=AsyncMock())
+    coordinator._relogin_backoff = MagicMock(async_wait_for_backoff=AsyncMock())
     return coordinator, pulse
 
 
@@ -68,7 +68,7 @@ async def test_dropped_session_logs_back_in_without_reauth(hass):
     await coordinator._async_update_data()
     pulse.async_login.assert_awaited_once()
     coordinator.config_entry.async_start_reauth.assert_not_called()
-    assert pulse.wait_for_update.await_count == 3
+    assert pulse.async_wait_for_update.await_count == 3
     coordinator._relogin_backoff.reset_backoff.assert_called_once()
 
 
@@ -91,7 +91,7 @@ async def test_account_lock_waits_instead_of_reauth(hass):
     coordinator, pulse = _run_coordinator(
         hass, [locked, PulseNotLoggedInError()], logins=[locked, None]
     )
-    with patch.object(PulseBackoff, "wait_for_backoff", AsyncMock()) as wait:
+    with patch.object(PulseBackoff, "async_wait_for_backoff", AsyncMock()) as wait:
         await coordinator._async_update_data()
     wait.assert_awaited()
     assert pulse.async_login.await_count == 1
@@ -105,7 +105,7 @@ async def test_rejected_login_starts_reauth(hass, error):
     await coordinator._async_update_data()
     coordinator.config_entry.async_start_reauth.assert_called_once()
     pulse.async_login.assert_not_called()
-    assert pulse.wait_for_update.await_count == 1
+    assert pulse.async_wait_for_update.await_count == 1
 
 
 @pytest.mark.parametrize("error", [PulseAuthenticationError(), PulseMFARequiredError()])
@@ -116,13 +116,13 @@ async def test_rejected_relogin_starts_reauth(hass, error):
     )
     await coordinator._async_update_data()
     coordinator.config_entry.async_start_reauth.assert_called_once()
-    assert pulse.wait_for_update.await_count == 1
+    assert pulse.async_wait_for_update.await_count == 1
 
 
 async def test_stop_during_relogin_ends_quietly(hass):
     """Stopping the coordinator while it waits to log back in ends the loop."""
     coordinator, pulse = _run_coordinator(hass, [PulseNotLoggedInError()])
-    coordinator._relogin_backoff.wait_for_backoff.side_effect = CancelledError()
+    coordinator._relogin_backoff.async_wait_for_backoff.side_effect = CancelledError()
     await coordinator._async_update_data()
     pulse.async_login.assert_not_called()
-    assert pulse.wait_for_update.await_count == 1
+    assert pulse.async_wait_for_update.await_count == 1

@@ -31,7 +31,7 @@ Home Assistant release makes uv fall back to a plugin too old to run.
 - `config_flow.py`: the user, MFA and reauth steps. `fingerprint.py` makes the
   browser-shaped fingerprint ADT trusts a device by.
 - `coordinator.py`: one long-running task that waits on
-  `PyADTPulseAsync.wait_for_update()` and pushes updates to the entities.
+  `PyADTPulseAsync.async_wait_for_update()` and pushes updates to the entities.
 - `alarm_control_panel.py`, `binary_sensor.py`, `sensor.py`: entities.
 - `tests/`: pytest-homeassistant-custom-component tests. Sockets are blocked,
   so mock the pyadtpulse client (`tests/conftest.py` has `make_pulse()`).
@@ -48,7 +48,7 @@ Home Assistant release makes uv fall back to a plugin too old to run.
   handled by logging back in.
 - **Only one session per account works.** A second login with the same
   credentials logs the first one out.
-- **pyadtpulse has no upper bound here** (`pyadtpulse>=2.0.0` in
+- **pyadtpulse has no upper bound here** (`pyadtpulse>=3.0.0` in
   `manifest.json` and `pyproject.toml`), so a new pyadtpulse major reaches
   users as soon as it's published. Keep both requirement lines in step.
 - **Ruff is pinned in two places** that must match: `ruff==` in the `dev`
