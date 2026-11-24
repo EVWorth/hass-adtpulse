@@ -11,7 +11,7 @@
     "iot_class": "cloud_push",
     "issue_tracker": "https://github.com/EVWorth/hass-adtpulse/issues",
     "requirements": [
-        "pyadtpulse>=1.2.14"
+        "pyadtpulse>=1.3.2"
     ],
     "version": "0.7.3"
 }
