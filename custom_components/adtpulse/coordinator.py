@@ -8,11 +8,15 @@ from collections.abc import Callable
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util.dt import utcnow, as_local, utc_from_timestamp
 from pyadtpulse.exceptions import (
-    PulseLoginException,
+    PulseConnectionError,
+    PulseMFARequiredError,
+    PulseNotLoggedInError,
     PulseExceptionWithRetry,
+    PulseAuthenticationError,
     PulseExceptionWithBackoff,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
+from pyadtpulse.pulse_backoff import PulseBackoff
 from pyadtpulse.pyadtpulse_async import PulseUpdate, PyADTPulseAsync
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -25,6 +29,10 @@ ZONE_CONTEXT_PREFIX = "Zone "
 ZONE_TROUBLE_PREFIX = " Trouble"
 CONNECTION_STATUS_CONTEXT = "ConnectionStatus"
 NEXT_REFRESH_CONTEXT = "NextRefresh"
+
+# seconds to wait before the second attempt to log back in; it doubles after
+# each failure, up to pyadtpulse's maximum backoff
+RELOGIN_BACKOFF_INITIAL = 10.0
 
 
 class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
@@ -41,6 +49,9 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
         logger.debug("%s: creating update coordinator", ADTPULSE_DOMAIN)
         self._adt_pulse = pulse_service
         self._update_task: Task | None = None
+        self._relogin_backoff = PulseBackoff(
+            "Coordinator relogin", RELOGIN_BACKOFF_INITIAL
+        )
         super().__init__(
             hass,
             logger,
@@ -134,15 +145,18 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
             update_exception: Exception | None = None
             try:
                 data = await self._adt_pulse.wait_for_update()
-            except PulseLoginException as ex:
-                logger.error(
-                    "%s: ADT Pulse login failed during coordinator update: %s",
-                    ADTPULSE_DOMAIN,
-                    ex,
-                )
-                if self.config_entry:
-                    self.config_entry.async_start_reauth(self.hass)
+            except (PulseAuthenticationError, PulseMFARequiredError) as ex:
+                update_exception = ex
+                self._start_reauth(ex)
                 return
+            except PulseNotLoggedInError as ex:
+                # Pulse ended the session, or pyadtpulse stopped its update
+                # tasks. That isn't a credentials problem, so log back in
+                # below instead of asking the user to re-authenticate.
+                logger.info(
+                    "%s: ADT Pulse session ended, logging back in", ADTPULSE_DOMAIN
+                )
+                update_exception = ex
             except PulseExceptionWithRetry as ex:
                 if ex.retry_time:
                     logger.debug(
@@ -169,17 +183,81 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 raise
             finally:
-                if update_exception:
-                    self.async_set_update_error(update_exception)
-                    # async_set_update_error will only notify listeners on first error
-                    # it also doesn't reset data
-                    self.data = None
-                    if not self.last_update_success:
-                        self.async_update_listeners()
-                else:
-                    self.last_exception = None
-                    self.async_set_updated_data(data)
+                self._publish_update(data, update_exception)
+
+            if isinstance(update_exception, PulseNotLoggedInError):
+                if not await self._async_relogin():
+                    return
+                continue
 
             logger.debug(
                 "%s: coordinator received update notification", ADTPULSE_DOMAIN
             )
+
+    def _publish_update(
+        self, data: PulseUpdate | None, update_exception: Exception | None
+    ) -> None:
+        """Pass an update, or the error that replaced it, to the entities."""
+        if update_exception:
+            self.async_set_update_error(update_exception)
+            # async_set_update_error will only notify listeners on first error
+            # it also doesn't reset data
+            self.data = None
+            if not self.last_update_success:
+                self.async_update_listeners()
+        else:
+            self.last_exception = None
+            self.async_set_updated_data(data)
+
+    def _start_reauth(self, ex: Exception) -> None:
+        """Ask the user to re-authenticate after Pulse rejected the login."""
+        logger.error(
+            "%s: ADT Pulse needs you to sign in again: %s", ADTPULSE_DOMAIN, ex
+        )
+        if self.config_entry:
+            self.config_entry.async_start_reauth(self.hass)
+
+    async def _async_relogin(self) -> bool:
+        """Log back in after the Pulse session ended.
+
+        Waits longer after each failed attempt, so a portal outage doesn't
+        get hammered with logins.
+
+        Returns:
+            bool: False if Pulse rejected the credentials or asked for a
+                verification code, so reauthentication was started, or if
+                the coordinator was stopped; the update loop should then end.
+                True otherwise, whether or not the login worked; if it
+                didn't, the loop tries again.
+        """
+        try:
+            await self._relogin_backoff.wait_for_backoff()
+            await self._adt_pulse.async_login()
+        except CancelledError:
+            logger.debug("%s: coordinator received cancellation", ADTPULSE_DOMAIN)
+            return False
+        except (PulseAuthenticationError, PulseMFARequiredError) as ex:
+            self._start_reauth(ex)
+            return False
+        except (
+            PulseNotLoggedInError,
+            PulseConnectionError,
+            PulseExceptionWithBackoff,
+        ) as ex:
+            # PulseExceptionWithBackoff includes PulseAccountLockedError, which
+            # clears by itself once its retry time passes
+            logger.warning(
+                "%s: could not log back in to ADT Pulse, will retry: %s",
+                ADTPULSE_DOMAIN,
+                ex,
+            )
+            self._relogin_backoff.increment_backoff()
+            if isinstance(ex, PulseExceptionWithRetry):
+                try:
+                    await ex.backoff.wait_for_backoff()
+                except CancelledError:
+                    return False
+            return True
+        self._relogin_backoff.reset_backoff()
+        logger.info("%s: logged back in to ADT Pulse", ADTPULSE_DOMAIN)
+        return True
