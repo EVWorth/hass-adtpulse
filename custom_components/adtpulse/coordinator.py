@@ -13,7 +13,7 @@ from pyadtpulse.exceptions import (
     PulseExceptionWithBackoff,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
-from pyadtpulse.pyadtpulse_async import PyADTPulseAsync
+from pyadtpulse.pyadtpulse_async import PulseUpdate, PyADTPulseAsync
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import ADTPULSE_DOMAIN
@@ -73,21 +73,36 @@ class ADTPulseDataUpdateCoordinator(DataUpdateCoordinator):
                 utcnow() - start_time,
             )
             return
-        data_to_update: tuple[bool, set[int]] = self.data
-        if data_to_update[0]:
-            self._listener_dictionary[ALARM_CONTEXT]()
-        for zones in data_to_update[1]:
-            self._listener_dictionary[ZONE_CONTEXT_PREFIX + str(zones)]()
-            self._listener_dictionary[
-                ZONE_CONTEXT_PREFIX + str(zones) + ZONE_TROUBLE_PREFIX
-            ]()
+        data_to_update: PulseUpdate = self.data
+        if data_to_update.alarm_changed:
+            self._call_listener(ALARM_CONTEXT)
+        for zone in data_to_update.updated_zones:
+            self._call_listener(ZONE_CONTEXT_PREFIX + str(zone))
+            self._call_listener(ZONE_CONTEXT_PREFIX + str(zone) + ZONE_TROUBLE_PREFIX)
         for i in CONNECTION_STATUS_CONTEXT, NEXT_REFRESH_CONTEXT:
-            self._listener_dictionary[i]()
+            self._call_listener(i)
         logger.debug(
             "%s: partial async_update_listeners took %s",
             ADTPULSE_DOMAIN,
             utcnow() - start_time,
         )
+
+    def _call_listener(self, context: str) -> None:
+        """Call one entity's listener.
+
+        A listener that fails is logged and skipped, so one entity can't stop
+        the others, or the update loop, from getting updates.
+        """
+        update_callback = self._listener_dictionary.get(context)
+        if update_callback is None:
+            logger.debug("%s: no listener for %s", ADTPULSE_DOMAIN, context)
+            return
+        try:
+            update_callback()
+        except Exception:
+            logger.exception(
+                "%s: error updating listener for %s", ADTPULSE_DOMAIN, context
+            )
 
     async def start(self) -> None:
         """Start ADT Pulse update coordinator.
