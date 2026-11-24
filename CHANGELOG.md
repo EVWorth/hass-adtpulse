@@ -1,3 +1,9 @@
+## 1.0.0 (2026-11-24)
+
+### Refactor
+
+- use pyadtpulse 3.0's async_ method names and require it
+
 ## 0.8.1 (2026-11-24)
 
 ### Fix
