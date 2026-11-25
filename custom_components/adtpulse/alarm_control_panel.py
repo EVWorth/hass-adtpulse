@@ -32,6 +32,7 @@ from homeassistant.components.alarm_control_panel import (
 
 from .const import ADTPULSE_DOMAIN
 from .utils import (
+    blocking_zones,
     get_alarm_unique_id,
     migrate_entity_name,
     system_can_be_armed,
@@ -53,6 +54,7 @@ ALARM_MAP = {
 
 
 FORCE_ARM = "force arm"
+ALARM_ACTION_FAILED_EVENT = f"{ADTPULSE_DOMAIN}_alarm_action_failed"
 ARM_ERROR_MESSAGE = (
     f"Pulse system cannot be armed due to opened/tripped zone - use {FORCE_ARM}"
 )
@@ -145,6 +147,33 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         arm_disarm_func: Callable[[], Coroutine[Any, Any, bool]],
         action: AlarmControlPanelState,
         force: bool = False,
+    ) -> None:
+        """Run an arm or disarm action, firing an event if it fails.
+
+        Home Assistant shows the error to whoever called the action, but
+        callers such as HomeKit can't display it, so the failure is also fired
+        as ALARM_ACTION_FAILED_EVENT for automations to report.
+        """
+        try:
+            await self._run_alarm_action(arm_disarm_func, action, force)
+        except Exception as err:
+            self.hass.bus.async_fire(
+                ALARM_ACTION_FAILED_EVENT,
+                {
+                    "entity_id": self.entity_id,
+                    "action": str(action),
+                    "force": force,
+                    "message": str(err) or type(err).__name__,
+                    "blocking_zones": blocking_zones(self._site),
+                },
+            )
+            raise
+
+    async def _run_alarm_action(
+        self,
+        arm_disarm_func: Callable[[], Coroutine[Any, Any, bool]],
+        action: AlarmControlPanelState,
+        force: bool,
     ) -> None:
         """Check the alarm can change to action, then call arm_disarm_func.
 
