@@ -31,7 +31,7 @@ This platform supports the following services:
 
 ### Failed arming
 
-When an arm or disarm action fails, Home Assistant shows the error to whoever called it. Some callers, such as HomeKit or Siri, can't display it, so the integration also fires an `adtpulse_alarm_action_failed` event:
+When an arm or disarm action fails, Home Assistant shows the error to whoever called it. Some callers, such as HomeKit or Siri, can't display it, so the integration also fires an `adtpulse_alarm_action_failed` event. It also fires when ADT accepts a command but the alarm hasn't reached the requested state 5 minutes later:
 
 | Field | Value |
 | --- | --- |
