@@ -62,6 +62,22 @@ def zone_is_in_trouble(zone: ADTPulseZoneData) -> bool:
     return zone.status != STATE_ONLINE
 
 
+def blocking_zones(site: ADTPulseSite) -> list[str]:
+    """Return the zones that stop the system arming without force.
+
+    Each entry is the zone name with its open state or trouble status, for
+    example "Front Door open" or "Kitchen Window low battery".
+    """
+    zones = site.zones_as_dict
+    if zones is None:
+        return []
+    return [
+        f"{zone.name} {(zone.state if zone_is_open(zone) else zone.status).lower()}"
+        for zone in zones.values()
+        if zone_is_open(zone) or zone_is_in_trouble(zone)
+    ]
+
+
 def system_can_be_armed(site: ADTPulseSite) -> bool:
     """Determine is the system is able to be armed without being forced."""
     zones = site.zones_as_dict

@@ -29,6 +29,36 @@ This platform supports the following services:
 * `alarm_arm_custom_bypass`
 
 
+### Failed arming
+
+When an arm or disarm action fails, Home Assistant shows the error to whoever called it. Some callers, such as HomeKit or Siri, can't display it, so the integration also fires an `adtpulse_alarm_action_failed` event. It also fires when ADT accepts a command but the alarm hasn't reached the requested state 5 minutes later:
+
+| Field | Value |
+| --- | --- |
+| `entity_id` | the alarm panel entity |
+| `action` | the state asked for: `armed_home`, `armed_away`, `armed_night`, `armed_custom_bypass` or `disarmed` |
+| `force` | `true` for a force arm |
+| `message` | the error |
+| `blocking_zones` | the zones that stop a normal arm, for example `["Front Door open"]` |
+
+An automation can turn it into a notification:
+
+```yaml
+automation:
+  - alias: "Alarm: notify when arming fails"
+    trigger:
+      - platform: event
+        event_type: adtpulse_alarm_action_failed
+    action:
+      - service: notify.mobile_app_my_phone
+        data:
+          title: "Alarm did not change to {{ trigger.event.data.action }}"
+          message: >-
+            {% set z = trigger.event.data.blocking_zones %}
+            {{ 'Open: ' ~ z | join(', ') if z and not trigger.event.data.force
+               else trigger.event.data.message }}
+```
+
 ## Verification codes
 
 ADT Pulse requires multi-factor authentication. The first time you set up the integration, ADT emails a verification code to the contact on your account, and Home Assistant asks for it. Home Assistant then adds itself to the account's trusted devices as "Home Assistant", so later logins don't need a code.

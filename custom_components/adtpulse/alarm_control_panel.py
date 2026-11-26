@@ -7,7 +7,7 @@ from functools import partial
 from collections.abc import Callable, Coroutine
 
 from pyadtpulse.site import ADTPulseSite
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util.dt import as_local
 from pyadtpulse.alarm_panel import (
     ADT_ALARM_OFF,
@@ -18,6 +18,7 @@ from pyadtpulse.alarm_panel import (
     ADT_ALARM_DISARMING,
 )
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_call_later
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import (
@@ -32,6 +33,7 @@ from homeassistant.components.alarm_control_panel import (
 
 from .const import ADTPULSE_DOMAIN
 from .utils import (
+    blocking_zones,
     get_alarm_unique_id,
     migrate_entity_name,
     system_can_be_armed,
@@ -53,6 +55,14 @@ ALARM_MAP = {
 
 
 FORCE_ARM = "force arm"
+ALARM_ACTION_FAILED_EVENT = f"{ADTPULSE_DOMAIN}_alarm_action_failed"
+# How long Pulse gets to report the requested state after accepting a command.
+# Arming waits out the panel's exit delay first.
+ACTION_CONFIRM_TIMEOUT = 300
+# The state each action should end in, where that isn't the action itself.
+ACTION_RESULT_STATE = {
+    AlarmControlPanelState.ARMED_CUSTOM_BYPASS: AlarmControlPanelState.ARMED_AWAY,
+}
 ARM_ERROR_MESSAGE = (
     f"Pulse system cannot be armed due to opened/tripped zone - use {FORCE_ARM}"
 )
@@ -101,6 +111,8 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         logger.debug("%s: adding alarm control panel for %s", ADTPULSE_DOMAIN, site.id)
         self._name = f"ADT Alarm Panel - Site {site.id}"
         self._assumed_state: AlarmControlPanelState | None = None
+        self._cancel_confirm: CALLBACK_TYPE | None = None
+        self._confirm_state: AlarmControlPanelState | None = None
         super().__init__(coordinator, ALARM_CONTEXT)
 
     @property
@@ -146,10 +158,96 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         action: AlarmControlPanelState,
         force: bool = False,
     ) -> None:
+        """Run an arm or disarm action, firing an event if it fails.
+
+        Home Assistant shows the error to whoever called the action, but
+        callers such as HomeKit can't display it, so the failure is also fired
+        as ALARM_ACTION_FAILED_EVENT for automations to report.
+
+        Pulse can accept a command that the panel never carries out, so once a
+        command is accepted, the event also fires if the alarm hasn't reached
+        the requested state ACTION_CONFIRM_TIMEOUT seconds later.
+        """
+        self._stop_confirm()
+        try:
+            sent = await self._run_alarm_action(arm_disarm_func, action, force)
+        except Exception as err:
+            self._fire_action_failed(action, force, str(err) or type(err).__name__)
+            raise
+        if sent:
+            self._confirm_state = ACTION_RESULT_STATE.get(action, action)
+            self._cancel_confirm = async_call_later(
+                self.hass,
+                ACTION_CONFIRM_TIMEOUT,
+                partial(self._confirm_action, action, force),
+            )
+
+    def _fire_action_failed(
+        self, action: AlarmControlPanelState, force: bool, message: str
+    ) -> None:
+        """Fire ALARM_ACTION_FAILED_EVENT for a failed action."""
+        self.hass.bus.async_fire(
+            ALARM_ACTION_FAILED_EVENT,
+            {
+                "entity_id": self.entity_id,
+                "action": str(action),
+                "force": force,
+                "message": message,
+                "blocking_zones": blocking_zones(self._site),
+            },
+        )
+
+    @callback
+    def _confirm_action(
+        self, action: AlarmControlPanelState, force: bool, _now: datetime
+    ) -> None:
+        """Fire the failure event if the alarm didn't reach the action's state."""
+        expected = self._confirm_state
+        self._cancel_confirm = None
+        self._confirm_state = None
+        actual = ALARM_MAP.get(self._alarm.status)
+        if actual == expected:
+            return
+        logger.warning(
+            "ADT Pulse alarm is %s %d seconds after the command to set it to %s",
+            actual,
+            ACTION_CONFIRM_TIMEOUT,
+            expected,
+        )
+        self._fire_action_failed(
+            action,
+            force,
+            f"Pulse accepted the command, but the alarm is {actual} "
+            f"{ACTION_CONFIRM_TIMEOUT} seconds later instead of {expected}",
+        )
+
+    @callback
+    def _stop_confirm(self) -> None:
+        """Cancel a pending check from an earlier action."""
+        if self._cancel_confirm is not None:
+            self._cancel_confirm()
+            self._cancel_confirm = None
+        self._confirm_state = None
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Cancel a pending check when the entity is removed."""
+        self._stop_confirm()
+        await super().async_will_remove_from_hass()
+
+    async def _run_alarm_action(
+        self,
+        arm_disarm_func: Callable[[], Coroutine[Any, Any, bool]],
+        action: AlarmControlPanelState,
+        force: bool,
+    ) -> bool:
         """Check the alarm can change to action, then call arm_disarm_func.
 
         arm_disarm_func is only called (and its coroutine only created) once the
         checks pass. force skips the open-zone check, for force arming.
+
+        Returns:
+            True if Pulse accepted the command, False if the alarm was already
+            in that state and no command was sent.
         """
         result = True
         logger.debug("%s: Setting Alarm to %s", ADTPULSE_DOMAIN, action)
@@ -157,7 +255,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
             self._check_if_system_armable(action, force)
         if self.alarm_state == action:
             logger.warning("Attempting to set alarm to same state, ignoring")
-            return
+            return False
         if not self._gateway.is_online:
             self._assumed_state = action
         elif action == AlarmControlPanelState.DISARMED:
@@ -172,6 +270,7 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         self.async_write_ha_state()
         if not result:
             raise HomeAssistantError(f"Could not set alarm status to {action}")
+        return True
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
@@ -277,4 +376,11 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
             self._site.alarm_control_panel.status,
             self._site.id,
         )
+        # the alarm got there, so a later change (such as a keypad disarm)
+        # isn't a failure of the command
+        if (
+            self._confirm_state is not None
+            and ALARM_MAP.get(self._alarm.status) == self._confirm_state
+        ):
+            self._stop_confirm()
         self.async_write_ha_state()
