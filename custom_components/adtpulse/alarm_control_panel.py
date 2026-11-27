@@ -165,12 +165,15 @@ class ADTPulseAlarm(ADTPulseEntity, AlarmControlPanelEntity):
         else:
             self._assumed_state = AlarmControlPanelState.ARMING
         self.async_write_ha_state()
-        result = await arm_disarm_func()
+        try:
+            result = await arm_disarm_func()
+        finally:
+            # Clear the assumed state however the call ends, so an exception
+            # doesn't leave the entity stuck at arming/disarming.
+            self._assumed_state = None
+            self.async_write_ha_state()
         if not result:
             logger.warning("Could not %s ADT Pulse alarm", action)
-        self._assumed_state = None
-        self.async_write_ha_state()
-        if not result:
             raise HomeAssistantError(f"Could not set alarm status to {action}")
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:

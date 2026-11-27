@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pyadtpulse.alarm_panel import ADT_ALARM_OFF
+from pyadtpulse.alarm_panel import ADT_ALARM_OFF, ADT_ALARM_AWAY
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.components.alarm_control_panel import AlarmControlPanelState
 
@@ -55,6 +55,25 @@ async def test_arm_home_when_closed():
     entity, site = _alarm(zone_open=False)
     await entity.async_alarm_arm_home()
     site.async_arm_home.assert_awaited_once_with()
+
+
+async def test_arm_that_raises_clears_assumed_state():
+    """An arm command that raises leaves the real state showing, not arming."""
+    entity, site = _alarm(zone_open=False)
+    site.async_arm_home.side_effect = RuntimeError("connection lost")
+    with pytest.raises(RuntimeError):
+        await entity.async_alarm_arm_home()
+    assert entity.alarm_state is AlarmControlPanelState.DISARMED
+
+
+async def test_disarm_that_raises_clears_assumed_state():
+    """A disarm command that raises leaves the real state showing, not disarming."""
+    entity, site = _alarm(zone_open=False)
+    site.alarm_control_panel.status = ADT_ALARM_AWAY
+    site.async_disarm = AsyncMock(side_effect=RuntimeError("connection lost"))
+    with pytest.raises(RuntimeError):
+        await entity.async_alarm_disarm()
+    assert entity.alarm_state is AlarmControlPanelState.ARMED_AWAY
 
 
 async def test_unknown_status_update_does_not_raise():
