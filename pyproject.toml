@@ -11,7 +11,7 @@ dependencies = ["homeassistant>=2026.3.0", "pyadtpulse>=3.0.0"]
 
 [dependency-groups]
 dev = [
-    "commitizen==4.19.4",
+    "commitizen==4.20.1",
     "pre-commit>=4.3.0",
     # Exact pin: ruff-action in the Validate workflow installs this version.
     # Keep it in sync with the ruff-pre-commit rev in .pre-commit-config.yaml.
